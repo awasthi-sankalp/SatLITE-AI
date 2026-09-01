@@ -9,14 +9,14 @@ export default function Home() {
         </div>
       </Show>
       <Show when="signed-in">
-        <div className="relative flex flex-col items-center justify-center min-h-screen w-full">
+        <div className="relative flex flex-col items-center min-h-screen w-full pt-8 overflow-hidden">
           {/* Top Right Corner User Button */}
-          <div className="absolute top-6 right-6">
+          <div className="absolute top-6 right-6 z-10">
             <UserButton />
           </div>
           
-          {/* Centered Heading */}
-          <h1 className="text-4xl md:text-6xl font-bold text-center">
+          {/* Heading with custom scroll & shrink animation */}
+          <h1 className="text-4xl md:text-5xl font-bold text-center animate-welcome">
             Welcome to SatLITE AI
           </h1>
         </div>

@@ -19,3 +19,22 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Custom Welcome Landing Page Animation */
+.animate-welcome {
+  /* Starts slightly delayed so the user sees it in the center first, then glides up */
+  animation: welcomeSlideShrink 1.5s cubic-bezier(0.25, 1, 0.5, 1) 0.5s forwards;
+  /* Initial state before animation triggers (centered and enlarged) */
+  transform: translateY(40vh) scale(1.4);
+  transform-origin: top center;
+  will-change: transform;
+}
+
+@keyframes welcomeSlideShrink {
+  0% {
+    transform: translateY(40vh) scale(1.4);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
