@@ -1,6 +1,7 @@
 import { SignIn } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import BreakLoop from './BreakLoop';
 
 export default async function Home() {
   const { userId } = await auth();
@@ -12,6 +13,7 @@ export default async function Home() {
 
   return (
     <main className="bg-white font-sans text-black min-h-screen w-full">
+      <BreakLoop />
       <div className="flex items-center justify-center min-h-screen w-full">
         <SignIn 
           routing="hash" 
