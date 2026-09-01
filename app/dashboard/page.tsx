@@ -11,16 +11,17 @@ export default async function Dashboard() {
   }
 
   return (
-    <main className="bg-white font-sans text-black min-h-screen w-full px-4 sm:px-6">
+    <main className="bg-white font-sans text-black min-h-screen w-full flex flex-col px-4 sm:px-6 overflow-hidden">
       <ClearHash />
-      <div className="relative flex flex-col items-center min-h-screen w-full pt-8 overflow-hidden">
-        {/* Top Right Corner User Button */}
-        <div className="absolute top-6 right-0 z-10">
-          <UserButton />
-        </div>
-        
-        {/* Heading with custom scroll & shrink animation */}
-        <h1 className="text-4xl md:text-5xl font-bold text-center animate-welcome px-2 leading-tight">
+      
+      {/* Top Header for User Button */}
+      <header className="w-full flex justify-end pt-6">
+        <UserButton />
+      </header>
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col items-center w-full pt-12">
+        <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-center animate-welcome leading-tight max-w-[85vw] md:max-w-none mx-auto">
           Welcome to SatLITE AI
         </h1>
       </div>
