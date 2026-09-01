@@ -6,6 +6,7 @@ export default function Home() {
       <Show when="signed-out">
         <div className="flex flex-col items-center w-full max-w-md">
           <SignIn 
+            routing="hash"
             appearance={{
               elements: {
                 footer: 'hidden',
