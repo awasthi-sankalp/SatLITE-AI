@@ -1,6 +1,7 @@
 import { UserButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import ClearHash from './ClearHash';
 
 export default async function Dashboard() {
   const { userId } = await auth();
@@ -11,6 +12,7 @@ export default async function Dashboard() {
 
   return (
     <main className="bg-white font-sans text-black min-h-screen w-full">
+      <ClearHash />
       <div className="relative flex flex-col items-center min-h-screen w-full pt-8 overflow-hidden">
         {/* Top Right Corner User Button */}
         <div className="absolute top-6 right-6 z-10">
