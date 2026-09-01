@@ -12,7 +12,7 @@ export default async function Home() {
   }
 
   return (
-    <main className="bg-white font-sans text-black min-h-screen w-full">
+    <main className="bg-white font-sans text-black min-h-screen w-full px-4 sm:px-6">
       <BreakLoop />
       <div className="flex items-center justify-center min-h-screen w-full">
         <SignIn 

@@ -23,18 +23,27 @@ body {
 /* Custom Welcome Landing Page Animation */
 .animate-welcome {
   /* Slowed down to 2 seconds for a smoother transition, with a 2-second delay */
-  animation: welcomeSlideShrink 2s cubic-bezier(0.25, 1, 0.5, 1) 2s forwards;
-  /* Initial state: perfectly centered, much larger text */
-  transform: translateY(40vh) scale(2);
+  animation: welcomeSlideShrinkMobile 2s cubic-bezier(0.25, 1, 0.5, 1) 2s forwards;
+  /* Initial state for mobile: perfectly centered, slightly larger text */
+  transform: translateY(40vh) scale(1.1);
   transform-origin: center;
   will-change: transform;
 }
 
-@keyframes welcomeSlideShrink {
-  0% {
+@keyframes welcomeSlideShrinkMobile {
+  0% { transform: translateY(40vh) scale(1.1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@media (min-width: 768px) {
+  .animate-welcome {
+    animation: welcomeSlideShrinkDesktop 2s cubic-bezier(0.25, 1, 0.5, 1) 2s forwards;
+    /* Initial state for desktop: massive 2x text */
     transform: translateY(40vh) scale(2);
   }
-  100% {
-    transform: translateY(0) scale(1);
+
+  @keyframes welcomeSlideShrinkDesktop {
+    0% { transform: translateY(40vh) scale(2); }
+    100% { transform: translateY(0) scale(1); }
   }
 }
