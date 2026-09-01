@@ -1,6 +1,14 @@
 import { UserButton } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
 
-export default function Dashboard() {
+export default async function Dashboard() {
+  const { userId } = await auth();
+
+  if (!userId) {
+    redirect('/');
+  }
+
   return (
     <main className="bg-white font-sans text-black min-h-screen w-full">
       <div className="relative flex flex-col items-center min-h-screen w-full pt-8 overflow-hidden">
