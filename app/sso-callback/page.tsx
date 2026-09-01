@@ -4,8 +4,8 @@ export default function SSOCallback() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-white">
       <AuthenticateWithRedirectCallback 
-        signInFallbackRedirectUrl="/"
-        signUpFallbackRedirectUrl="/"
+        signInFallbackRedirectUrl="/dashboard"
+        signUpFallbackRedirectUrl="/dashboard"
       />
     </div>
   );

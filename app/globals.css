@@ -22,8 +22,8 @@ body {
 
 /* Custom Welcome Landing Page Animation */
 .animate-welcome {
-  /* Slowed down to 2 seconds for a smoother transition */
-  animation: welcomeSlideShrink 2s cubic-bezier(0.25, 1, 0.5, 1) 0.5s forwards;
+  /* Slowed down to 2 seconds for a smoother transition, with a 2-second delay */
+  animation: welcomeSlideShrink 2s cubic-bezier(0.25, 1, 0.5, 1) 2s forwards;
   /* Initial state: perfectly centered, much larger text */
   transform: translateY(40vh) scale(2);
   transform-origin: center;
