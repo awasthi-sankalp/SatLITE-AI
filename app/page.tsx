@@ -4,9 +4,7 @@ export default function Home() {
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-white font-sans text-black min-h-screen">
       <Show when="signed-out">
-        <SignIn 
-          signUpUrl="/sign-up" 
-        />
+        <SignIn routing="hash" />
       </Show>
       <Show when="signed-in">
         <div className="flex flex-col items-center gap-4">
