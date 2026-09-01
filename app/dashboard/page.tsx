@@ -20,7 +20,7 @@ export default async function Dashboard() {
       </div>
       
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col items-center w-full pt-24">
+      <div className="flex-1 flex flex-col items-center w-full pt-8">
         <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-center animate-welcome leading-tight max-w-[85vw] md:max-w-none mx-auto">
           Welcome to SatLITE AI
         </h1>
