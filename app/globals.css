@@ -22,17 +22,17 @@ body {
 
 /* Custom Welcome Landing Page Animation */
 .animate-welcome {
-  /* Starts slightly delayed so the user sees it in the center first, then glides up */
-  animation: welcomeSlideShrink 1.5s cubic-bezier(0.25, 1, 0.5, 1) 0.5s forwards;
-  /* Initial state before animation triggers (centered and enlarged) */
-  transform: translateY(40vh) scale(1.4);
-  transform-origin: top center;
+  /* Slowed down to 2 seconds for a smoother transition */
+  animation: welcomeSlideShrink 2s cubic-bezier(0.25, 1, 0.5, 1) 0.5s forwards;
+  /* Initial state: perfectly centered, much larger text */
+  transform: translateY(40vh) scale(2);
+  transform-origin: center;
   will-change: transform;
 }
 
 @keyframes welcomeSlideShrink {
   0% {
-    transform: translateY(40vh) scale(1.4);
+    transform: translateY(40vh) scale(2);
   }
   100% {
     transform: translateY(0) scale(1);
