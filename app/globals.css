@@ -19,8 +19,3 @@ body {
   margin: 0;
   padding: 0;
 }
-
-/* Force hide the internal Clerk "Don't have an account" link */
-.cl-footerAction {
-  display: none !important;
-}

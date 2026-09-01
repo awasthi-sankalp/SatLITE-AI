@@ -8,9 +8,7 @@ export default function Home() {
           <SignIn 
             appearance={{
               elements: {
-                footerAction: 'hidden',
-                footerActionText: 'hidden',
-                footerActionLink: 'hidden',
+                footer: 'hidden',
               }
             }}
           />
