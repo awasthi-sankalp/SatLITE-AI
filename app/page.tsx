@@ -9,6 +9,8 @@ export default function Home() {
             appearance={{
               elements: {
                 footerAction: 'hidden',
+                footerActionText: 'hidden',
+                footerActionLink: 'hidden',
               }
             }}
           />
