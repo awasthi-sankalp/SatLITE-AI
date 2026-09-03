@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python backend (do NOT commit the 2GB venv or model cache)
+backend/venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+*.pyc
