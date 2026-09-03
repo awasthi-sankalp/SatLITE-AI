@@ -3,7 +3,7 @@ import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 // ── Gemini setup ──────────────────────────────────────────────────────────────
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-const MODEL = 'gemini-2.0-flash';
+const MODEL = 'gemini-3.6-flash';
 
 // ── Remote Sensing system prompt ──────────────────────────────────────────────
 const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst specializing in:
