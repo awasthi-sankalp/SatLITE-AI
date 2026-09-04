@@ -3,7 +3,7 @@ import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 // ── Gemini setup ──────────────────────────────────────────────────────────────
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-const MODEL = 'gemini-3.8-flash';
+const MODEL = 'gemini-3.5-flash';
 
 // ── Remote Sensing system prompt ──────────────────────────────────────────────
 const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst specializing in:
@@ -128,6 +128,47 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
   return scores[best] > 0 ? best : 'single_vqa';
 }
 
+// ── Fallback: Cloud Gemma 4 API ───────────────────────────────────────────────
+async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
+  const GEMMA_API_KEY = process.env.GEMMA_API_KEY;
+  const GEMMA_ENDPOINT = process.env.GEMMA_ENDPOINT || 'https://api.huggingface.co/v1/chat/completions';
+  
+  if (!GEMMA_API_KEY) {
+    throw new Error('Gemini failed, and Gemma fallback is missing GEMMA_API_KEY.');
+  }
+
+  // Convert Gemini image parts to Standard OpenAI/Cloud Vision format
+  const content = [{ type: 'text', text: prompt }];
+  imageParts.forEach(part => {
+    content.push({
+      type: 'image_url',
+      // @ts-ignore
+      image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` }
+    });
+  });
+
+  const response = await fetch(GEMMA_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GEMMA_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gemma-4-vision-instruct', // Update to your specific Gemma 4 cloud model name
+      messages: [{ role: 'user', content }],
+      max_tokens: 800,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemma Fallback API Error: ${errText}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const start = Date.now();
@@ -148,7 +189,6 @@ export async function POST(request: NextRequest) {
     if (!query) return NextResponse.json({ error: 'Query is required.' }, { status: 400 });
     if (!imageFiles.length) return NextResponse.json({ error: 'At least one image is required.' }, { status: 400 });
 
-    // Validate image count vs mode
     const required = mode === 'single' ? 1 : 2;
     if (mode !== 'single' && imageFiles.length < 2) {
       return NextResponse.json(
@@ -157,7 +197,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert images to Gemini inline parts
     const imageParts: Part[] = await Promise.all(
       imageFiles.slice(0, required).map(async (file) => {
         const bytes = await file.arrayBuffer();
@@ -167,18 +206,28 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // Classify task & build prompt
     const task = classifyTask(query, imageFiles.length, mode);
     const promptTemplate = PROMPTS[task] || PROMPTS.single_vqa;
-    const promptText = promptTemplate.replace('{query}', query);
+    // Inject the guardrails directly into the prompt text to ensure fallback models see it too
+    const promptText = `${RS_SYSTEM}\n\nTask: ${promptTemplate.replace('{query}', query)}`;
 
-    // Call Gemini
-    const model = genAI.getGenerativeModel({
-      model: MODEL,
-      systemInstruction: RS_SYSTEM,
-    });
-    const result = await model.generateContent([...imageParts, { text: promptText }]);
-    const answer = result.response.text().trim();
+    let answer = '';
+    let usedModel = MODEL;
+    let fallbackTriggered = false;
+
+    try {
+      // 1. Attempt Primary API (Gemini)
+      const model = genAI.getGenerativeModel({ model: MODEL });
+      const result = await model.generateContent([...imageParts, { text: promptText }]);
+      answer = result.response.text().trim();
+    } catch (geminiError) {
+      console.warn('Gemini API failed, triggering Gemma fallback:', geminiError);
+      
+      // 2. Fallback to Cloud Gemma
+      fallbackTriggered = true;
+      usedModel = 'gemma-4-cloud-fallback';
+      answer = await callGemmaCloudFallback(promptText, imageParts);
+    }
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
@@ -186,19 +235,11 @@ export async function POST(request: NextRequest) {
       answer,
       execution_summary: {
         task: TASK_LABELS[task],
-        task_id: task,
-        model: MODEL,
-        rs_adaptation:
-          'BigEarthNet.txt-aligned RS domain vocabulary injected as system prompt. ' +
-          'Gemini 1.5 Flash with remote sensing specialist context.',
+        model: usedModel,
+        fallback_used: fallbackTriggered,
+        rs_adaptation: 'System rules enforced for satellite validity and domain terminology.',
         mode,
         image_count: imageParts.length,
-        images: imageFiles.map((f) => ({
-          filename: f.name,
-          format: f.name.split('.').pop()?.toUpperCase() || 'UNKNOWN',
-          dimensions: 'N/A',
-        })),
-        query,
         elapsed_seconds: parseFloat(elapsed),
       },
     });
