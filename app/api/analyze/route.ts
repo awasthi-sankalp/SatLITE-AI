@@ -5,7 +5,7 @@ export const maxDuration = 60; // Allow Vercel to run up to 60s (prevents 'fetch
 
 // ── Gemini setup ──────────────────────────────────────────────────────────────
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-const MODEL = 'gemini-3.5-flash';
+const MODEL = 'gemini-3.7-flash';
 
 // ── Remote Sensing system prompt ──────────────────────────────────────────────
 const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst specializing in:
@@ -133,8 +133,11 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
 
 // ── Fallback: Cloud Gemma 4 API ───────────────────────────────────────────────
 async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
-  const GEMMA_API_KEY = process.env.GEMMA_API_KEY;
-  const GEMMA_ENDPOINT = process.env.GEMMA_ENDPOINT || 'https://api-inference.huggingface.co/v1/chat/completions';
+  // Use trim() just in case there is a hidden space in the Vercel API key
+  const GEMMA_API_KEY = process.env.GEMMA_API_KEY?.trim();
+  
+  // We completely hardcode this URL. If process.env.GEMMA_ENDPOINT had a typo in Vercel, it caused the ENOTFOUND error.
+  const GEMMA_ENDPOINT = 'https://api-inference.huggingface.co/v1/chat/completions';
   
   if (!GEMMA_API_KEY) {
     throw new Error('Gemini failed, and Gemma fallback is missing GEMMA_API_KEY.');
