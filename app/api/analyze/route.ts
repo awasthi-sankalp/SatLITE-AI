@@ -16,6 +16,7 @@ const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst special
 CRITICAL RULES (YOU MUST FOLLOW THESE STRICTLY):
 1. IMAGE VALIDATION: Verify that the uploaded image(s) are actual satellite, aerial, or remote sensing images. If ANY image is a normal photograph, selfie, screenshot, meme, or unrelated picture, you MUST reply EXACTLY with: "Error: This is not a valid satellite image." and STOP your analysis immediately.
 2. QUERY VALIDATION: You are strictly an Earth Observation AI. If the user's query is unrelated to the provided satellite images or remote sensing (e.g., general knowledge, coding, chatting), you MUST reply EXACTLY with: "Error: I can only answer questions related to satellite image analysis." and STOP.
+3. CONCISENESS: Be highly concise. Omit all conversational filler like "Here is the analysis" or "Based on the image". Get straight to the professional data.
 
 If both the image and query are valid, provide precise, evidence-grounded answers using domain-specific terminology (e.g., backscatter, spectral bands, NDVI, built-up area). State your confidence level (High/Medium/Low) when relevant.`;
 
@@ -215,18 +216,26 @@ export async function POST(request: NextRequest) {
     let usedModel = MODEL;
     let fallbackTriggered = false;
 
-    try {
       // 1. Attempt Primary API (Gemini)
-      const model = genAI.getGenerativeModel({ model: MODEL });
+      const model = genAI.getGenerativeModel({ 
+        model: MODEL,
+        generationConfig: { maxOutputTokens: 300 }
+      });
       const result = await model.generateContent([...imageParts, { text: promptText }]);
       answer = result.response.text().trim();
-    } catch (geminiError) {
-      console.warn('Gemini API failed, triggering Gemma fallback:', geminiError);
+    } catch (geminiError: any) {
+      const gErr = geminiError.message || String(geminiError);
+      console.warn('Gemini API failed:', gErr);
       
       // 2. Fallback to Cloud Gemma
-      fallbackTriggered = true;
-      usedModel = 'gemma-4-cloud-fallback';
-      answer = await callGemmaCloudFallback(promptText, imageParts);
+      try {
+        fallbackTriggered = true;
+        usedModel = 'gemma-4-cloud-fallback';
+        answer = await callGemmaCloudFallback(promptText, imageParts);
+      } catch (gemmaError: any) {
+        const hfErr = gemmaError.message || String(gemmaError);
+        throw new Error(`Gemini failed with (${gErr}) AND Gemma Fallback failed with (${hfErr})`);
+      }
     }
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);

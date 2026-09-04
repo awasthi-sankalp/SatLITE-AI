@@ -88,12 +88,45 @@ export default function DashboardClient() {
     setError(null);
   };
 
-  const handleFile = useCallback((index: number, file: File) => {
-    const preview = URL.createObjectURL(file);
+const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxWidth) {
+          const ratio = Math.min(maxWidth / width, maxWidth / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => blob ? resolve(new File([blob], file.name, { type: 'image/jpeg' })) : resolve(file),
+          'image/jpeg',
+          0.85 // Compress to 85% quality JPEG
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
+  const handleFile = useCallback(async (index: number, file: File) => {
+    const resizedFile = await resizeImage(file);
+    const preview = URL.createObjectURL(resizedFile);
     const label = MODES.find((m2) => m2.id === mode)!.slots[index];
     setSlots((prev) => {
       const next = [...prev];
-      next[index] = { file, preview, label };
+      next[index] = { file: resizedFile, preview, label };
       return next;
     });
   }, [mode]);
