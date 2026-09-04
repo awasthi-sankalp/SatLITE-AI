@@ -216,6 +216,7 @@ export async function POST(request: NextRequest) {
     let usedModel = MODEL;
     let fallbackTriggered = false;
 
+    try {
       // 1. Attempt Primary API (Gemini)
       const model = genAI.getGenerativeModel({ 
         model: MODEL,
