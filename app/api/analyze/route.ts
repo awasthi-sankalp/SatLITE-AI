@@ -132,7 +132,7 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
 // ── Fallback: Cloud Gemma 4 API ───────────────────────────────────────────────
 async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
   const GEMMA_API_KEY = process.env.GEMMA_API_KEY;
-  const GEMMA_ENDPOINT = process.env.GEMMA_ENDPOINT || 'https://api.huggingface.co/v1/chat/completions';
+  const GEMMA_ENDPOINT = process.env.GEMMA_ENDPOINT || 'https://api-inference.huggingface.co/v1/chat/completions';
   
   if (!GEMMA_API_KEY) {
     throw new Error('Gemini failed, and Gemma fallback is missing GEMMA_API_KEY.');
