@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
+export const maxDuration = 60; // Allow Vercel to run up to 60s (prevents 'fetch failed' timeouts)
+
 // ── Gemini setup ──────────────────────────────────────────────────────────────
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 const MODEL = 'gemini-3.5-flash';
@@ -235,7 +237,8 @@ export async function POST(request: NextRequest) {
         answer = await callGemmaCloudFallback(promptText, imageParts);
       } catch (gemmaError: any) {
         const hfErr = gemmaError.message || String(gemmaError);
-        throw new Error(`Gemini failed with (${gErr}) AND Gemma Fallback failed with (${hfErr})`);
+        const cause = gemmaError.cause ? ` (Cause: ${gemmaError.cause.message})` : '';
+        throw new Error(`Gemini hit Rate Limit/Failed (${gErr}) AND Gemma Fallback network request crashed with: ${hfErr}${cause}`);
       }
     }
 
