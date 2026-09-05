@@ -144,12 +144,11 @@ async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
   }
 
   // Convert Gemini image parts to Standard OpenAI/Cloud Vision format
-  const content = [{ type: 'text', text: prompt }];
+  const contentParts: object[] = [{ type: 'text', text: prompt }];
   imageParts.forEach(part => {
-    content.push({
+    contentParts.push({
       type: 'image_url',
-      // @ts-ignore
-      image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` }
+      image_url: { url: `data:${(part as any).inlineData.mimeType};base64,${(part as any).inlineData.data}` }
     });
   });
 
@@ -160,8 +159,9 @@ async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gemma-4-vision-instruct', // Update to your specific Gemma 4 cloud model name
-      messages: [{ role: 'user', content }],
+      // Llama 3.2 Vision is the best free vision model on HF Inference API
+      model: 'meta-llama/Llama-3.2-11B-Vision-Instruct',
+      messages: [{ role: 'user', content: contentParts }],
       max_tokens: 800,
     }),
   });
