@@ -156,7 +156,7 @@ async function callGroq(prompt: string, imageParts: Part[]) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct', // Llama 4 Vision, 14,400 req/day free
+      model: 'llama-3.2-11b-vision-preview', // Correct Groq Vision model ID
       messages: [{ role: 'user', content: contentParts }],
       max_tokens: 1024,
     }),
