@@ -131,19 +131,14 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
   return scores[best] > 0 ? best : 'single_vqa';
 }
 
-// ── Fallback: Cloud Gemma 4 API ───────────────────────────────────────────────
+// ── Fallback: HuggingFace Inference API (Llama Vision) ────────────────────────
 async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
-  // Use trim() just in case there is a hidden space in the Vercel API key
-  const GEMMA_API_KEY = process.env.GEMMA_API_KEY?.trim();
-  
-  // We completely hardcode this URL. If process.env.GEMMA_ENDPOINT had a typo in Vercel, it caused the ENOTFOUND error.
-  const GEMMA_ENDPOINT = 'https://api-inference.huggingface.co/v1/chat/completions';
-  
-  if (!GEMMA_API_KEY) {
-    throw new Error('Gemini failed, and Gemma fallback is missing GEMMA_API_KEY.');
+  const HF_API_KEY = process.env.GEMMA_API_KEY?.trim();
+
+  if (!HF_API_KEY) {
+    throw new Error('Gemini failed and HuggingFace fallback is missing GEMMA_API_KEY in Vercel env vars.');
   }
 
-  // Convert Gemini image parts to Standard OpenAI/Cloud Vision format
   const contentParts: object[] = [{ type: 'text', text: prompt }];
   imageParts.forEach(part => {
     contentParts.push({
@@ -152,23 +147,23 @@ async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
     });
   });
 
-  const response = await fetch(GEMMA_ENDPOINT, {
+  // HuggingFace updated their Inference API URL in 2025 — use api.huggingface.co (NOT api-inference)
+  const response = await fetch('https://api.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${GEMMA_API_KEY}`,
+      'Authorization': `Bearer ${HF_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      // Llama 3.2 Vision is the best free vision model on HF Inference API
       model: 'meta-llama/Llama-3.2-11B-Vision-Instruct',
       messages: [{ role: 'user', content: contentParts }],
-      max_tokens: 800,
+      max_tokens: 1024,
     }),
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Gemma Fallback API Error: ${errText}`);
+    throw new Error(`HuggingFace API Error ${response.status}: ${errText}`);
   }
 
   const data = await response.json();
