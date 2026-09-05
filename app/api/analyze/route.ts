@@ -223,10 +223,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // 1. Attempt Primary API (Gemini)
-      const model = genAI.getGenerativeModel({ 
-        model: MODEL,
-        generationConfig: { maxOutputTokens: 300 }
-      });
+      const model = genAI.getGenerativeModel({ model: MODEL });
       const result = await model.generateContent([...imageParts, { text: promptText }]);
       answer = result.response.text().trim();
     } catch (geminiError: any) {
