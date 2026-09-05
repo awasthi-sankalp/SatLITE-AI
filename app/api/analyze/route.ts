@@ -131,12 +131,14 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
   return scores[best] > 0 ? best : 'single_vqa';
 }
 
-// ── Groq Cloud API (Llama 4 Scout Vision) ────────────────────────────────────
-async function callGroq(prompt: string, imageParts: Part[]) {
-  const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim();
+// ── Hugging Face API (Localhost Testing) ──────────────────────────────────────
+async function callHuggingFace(prompt: string, imageParts: Part[]) {
+  // We'll reuse the GROQ_API_KEY env variable name just to keep it simple. 
+  // Put your Hugging Face key (hf_...) in the GROQ_API_KEY variable locally in your .env.local
+  const HF_API_KEY = process.env.GROQ_API_KEY?.trim();
 
-  if (!GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY is not set in Vercel environment variables.');
+  if (!HF_API_KEY) {
+    throw new Error('Hugging Face API key is not set in environment variables.');
   }
 
   const contentParts: object[] = [{ type: 'text', text: prompt }];
@@ -149,14 +151,14 @@ async function callGroq(prompt: string, imageParts: Part[]) {
     });
   });
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Authorization': `Bearer ${HF_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.2-11b-vision-preview', // Correct Groq Vision model ID
+      model: 'meta-llama/Llama-3.2-11B-Vision-Instruct', 
       messages: [{ role: 'user', content: contentParts }],
       max_tokens: 1024,
     }),
@@ -164,7 +166,7 @@ async function callGroq(prompt: string, imageParts: Part[]) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Groq API Error ${response.status}: ${errText}`);
+    throw new Error(`Hugging Face API Error ${response.status}: ${errText}`);
   }
 
   const data = await response.json();
@@ -206,7 +208,9 @@ export async function POST(request: NextRequest) {
     const promptText = `${RS_SYSTEM}\n\nTask: ${promptTemplate.replace('{query}', query)}`;
 
     let answer = '';
-    // ── TESTING: Gemini commented out — running solely on Groq (Llama 4 Vision) ─
+    let usedModel = 'llama-3.2-11b-vision (huggingface)';
+
+    // ── TESTING: Gemini commented out — running solely on Hugging Face ──────────
     // try {
     //   const geminiModel = genAI.getGenerativeModel({ model: MODEL });
     //   const geminiResult = await geminiModel.generateContent([...imageParts, { text: promptText }]);
@@ -214,10 +218,10 @@ export async function POST(request: NextRequest) {
     // } catch (geminiError: any) { ... }
 
     try {
-      answer = await callGroq(promptText, imageParts);
+      answer = await callHuggingFace(promptText, imageParts);
     } catch (err: any) {
       const cause = err.cause ? ` (Cause: ${err.cause.message})` : '';
-      throw new Error(`Groq failed: ${err.message}${cause}`);
+      throw new Error(`Hugging Face failed: ${err.message}${cause}`);
     }
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
