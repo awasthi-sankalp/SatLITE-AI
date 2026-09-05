@@ -221,26 +221,27 @@ export async function POST(request: NextRequest) {
     let usedModel = MODEL;
     let fallbackTriggered = false;
 
+    // ── TESTING MODE: Gemini commented out, using HF fallback directly ──────
+    // try {
+    //   // 1. Attempt Primary API (Gemini)
+    //   const model = genAI.getGenerativeModel({ model: MODEL });
+    //   const result = await model.generateContent([...imageParts, { text: promptText }]);
+    //   answer = result.response.text().trim();
+    // } catch (geminiError: any) {
+    //   const gErr = geminiError.message || String(geminiError);
+    //   console.warn('Gemini API failed:', gErr);
+
+    // 2. Fallback to Cloud Llama Vision (HF)
     try {
-      // 1. Attempt Primary API (Gemini)
-      const model = genAI.getGenerativeModel({ model: MODEL });
-      const result = await model.generateContent([...imageParts, { text: promptText }]);
-      answer = result.response.text().trim();
-    } catch (geminiError: any) {
-      const gErr = geminiError.message || String(geminiError);
-      console.warn('Gemini API failed:', gErr);
-      
-      // 2. Fallback to Cloud Gemma
-      try {
-        fallbackTriggered = true;
-        usedModel = 'gemma-4-cloud-fallback';
-        answer = await callGemmaCloudFallback(promptText, imageParts);
-      } catch (gemmaError: any) {
-        const hfErr = gemmaError.message || String(gemmaError);
-        const cause = gemmaError.cause ? ` (Cause: ${gemmaError.cause.message})` : '';
-        throw new Error(`Gemini hit Rate Limit/Failed (${gErr}) AND Gemma Fallback network request crashed with: ${hfErr}${cause}`);
-      }
+      fallbackTriggered = true;
+      usedModel = 'llama-3.2-11b-vision (huggingface)';
+      answer = await callGemmaCloudFallback(promptText, imageParts);
+    } catch (gemmaError: any) {
+      const hfErr = gemmaError.message || String(gemmaError);
+      const cause = gemmaError.cause ? ` (Cause: ${gemmaError.cause.message})` : '';
+      throw new Error(`HuggingFace Fallback failed: ${hfErr}${cause}`);
     }
+    // }
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
