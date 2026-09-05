@@ -131,14 +131,12 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
   return scores[best] > 0 ? best : 'single_vqa';
 }
 
-// ── Primary: OpenRouter Cloud API (Gemma 4 Vision) ────────────────────────────
-// Gemini is commented out. All requests go through OpenRouter → Gemma 4.
-// OpenRouter hosts google/gemma-4-27b-it and works on Vercel (not blocked like HuggingFace).
-async function callGemma4Cloud(prompt: string, imageParts: Part[]) {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim();
+// ── Groq Cloud API (Llama 4 Scout Vision) ────────────────────────────────────
+async function callGroq(prompt: string, imageParts: Part[]) {
+  const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim();
 
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('OPENROUTER_API_KEY is not set in Vercel environment variables.');
+  if (!GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not set in Vercel environment variables.');
   }
 
   const contentParts: object[] = [{ type: 'text', text: prompt }];
@@ -151,16 +149,14 @@ async function callGemma4Cloud(prompt: string, imageParts: Part[]) {
     });
   });
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://satliteai.vercel.app',
-      'X-Title': 'SatLITE AI',
     },
     body: JSON.stringify({
-      model: 'google/gemma-4-31b-it:free', // Gemma 4 31B by Google, free tier on OpenRouter
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct', // Llama 4 Vision, 14,400 req/day free
       messages: [{ role: 'user', content: contentParts }],
       max_tokens: 1024,
     }),
@@ -168,7 +164,7 @@ async function callGemma4Cloud(prompt: string, imageParts: Part[]) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`OpenRouter Gemma 4 API Error ${response.status}: ${errText}`);
+    throw new Error(`Groq API Error ${response.status}: ${errText}`);
   }
 
   const data = await response.json();
@@ -178,13 +174,6 @@ async function callGemma4Cloud(prompt: string, imageParts: Part[]) {
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const start = Date.now();
-
-  if (!process.env.GOOGLE_API_KEY) {
-    return NextResponse.json(
-      { error: 'GOOGLE_API_KEY is not configured. Add it to your Vercel environment variables.' },
-      { status: 503 }
-    );
-  }
 
   try {
     const formData = await request.formData();
@@ -214,23 +203,21 @@ export async function POST(request: NextRequest) {
 
     const task = classifyTask(query, imageFiles.length, mode);
     const promptTemplate = PROMPTS[task] || PROMPTS.single_vqa;
-    // Inject the guardrails directly into the prompt text to ensure fallback models see it too
     const promptText = `${RS_SYSTEM}\n\nTask: ${promptTemplate.replace('{query}', query)}`;
 
     let answer = '';
-    let usedModel = 'gemma-4-27b (openrouter)';
-
-    // ── Gemini COMMENTED OUT — running on Gemma 4 via OpenRouter ─────────────
-    // const geminiModel = genAI.getGenerativeModel({ model: MODEL });
-    // const geminiResult = await geminiModel.generateContent([...imageParts, { text: promptText }]);
-    // answer = geminiResult.response.text().trim();
-    // usedModel = MODEL;
+    // ── TESTING: Gemini commented out — running solely on Groq (Llama 4 Vision) ─
+    // try {
+    //   const geminiModel = genAI.getGenerativeModel({ model: MODEL });
+    //   const geminiResult = await geminiModel.generateContent([...imageParts, { text: promptText }]);
+    //   answer = geminiResult.response.text().trim();
+    // } catch (geminiError: any) { ... }
 
     try {
-      answer = await callGemma4Cloud(promptText, imageParts);
+      answer = await callGroq(promptText, imageParts);
     } catch (err: any) {
       const cause = err.cause ? ` (Cause: ${err.cause.message})` : '';
-      throw new Error(`Gemma 4 (OpenRouter) failed: ${err.message}${cause}`);
+      throw new Error(`Groq failed: ${err.message}${cause}`);
     }
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
@@ -239,7 +226,7 @@ export async function POST(request: NextRequest) {
       answer,
       execution_summary: {
         task: TASK_LABELS[task],
-        model: usedModel,
+        model: 'llama-4-scout-17b (groq)',
         rs_adaptation: 'System rules enforced for satellite validity and domain terminology.',
         mode,
         image_count: imageParts.length,
