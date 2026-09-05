@@ -160,7 +160,7 @@ async function callGemma4Cloud(prompt: string, imageParts: Part[]) {
       'X-Title': 'SatLITE AI',
     },
     body: JSON.stringify({
-      model: 'google/gemma-4-27b-it:free', // Gemma 4 by Google, free tier on OpenRouter
+      model: 'google/gemma-4-31b-it:free', // Gemma 4 31B by Google, free tier on OpenRouter
       messages: [{ role: 'user', content: contentParts }],
       max_tokens: 1024,
     }),
