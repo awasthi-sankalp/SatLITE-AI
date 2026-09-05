@@ -131,31 +131,36 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
   return scores[best] > 0 ? best : 'single_vqa';
 }
 
-// ── Fallback: HuggingFace Inference API (Llama Vision) ────────────────────────
-async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
-  const HF_API_KEY = process.env.GEMMA_API_KEY?.trim();
+// ── Primary: OpenRouter Cloud API (Gemma 4 Vision) ────────────────────────────
+// Gemini is commented out. All requests go through OpenRouter → Gemma 4.
+// OpenRouter hosts google/gemma-4-27b-it and works on Vercel (not blocked like HuggingFace).
+async function callGemma4Cloud(prompt: string, imageParts: Part[]) {
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim();
 
-  if (!HF_API_KEY) {
-    throw new Error('Gemini failed and HuggingFace fallback is missing GEMMA_API_KEY in Vercel env vars.');
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY is not set in Vercel environment variables.');
   }
 
   const contentParts: object[] = [{ type: 'text', text: prompt }];
   imageParts.forEach(part => {
     contentParts.push({
       type: 'image_url',
-      image_url: { url: `data:${(part as any).inlineData.mimeType};base64,${(part as any).inlineData.data}` }
+      image_url: {
+        url: `data:${(part as any).inlineData.mimeType};base64,${(part as any).inlineData.data}`
+      }
     });
   });
 
-  // HuggingFace updated their Inference API URL in 2025 — use api.huggingface.co (NOT api-inference)
-  const response = await fetch('https://api.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions', {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${HF_API_KEY}`,
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://satliteai.vercel.app',
+      'X-Title': 'SatLITE AI',
     },
     body: JSON.stringify({
-      model: 'meta-llama/Llama-3.2-11B-Vision-Instruct',
+      model: 'google/gemma-4-27b-it:free', // Gemma 4 by Google, free tier on OpenRouter
       messages: [{ role: 'user', content: contentParts }],
       max_tokens: 1024,
     }),
@@ -163,7 +168,7 @@ async function callGemmaCloudFallback(prompt: string, imageParts: Part[]) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`HuggingFace API Error ${response.status}: ${errText}`);
+    throw new Error(`OpenRouter Gemma 4 API Error ${response.status}: ${errText}`);
   }
 
   const data = await response.json();
@@ -213,30 +218,20 @@ export async function POST(request: NextRequest) {
     const promptText = `${RS_SYSTEM}\n\nTask: ${promptTemplate.replace('{query}', query)}`;
 
     let answer = '';
-    let usedModel = MODEL;
-    let fallbackTriggered = false;
+    let usedModel = 'gemma-4-27b (openrouter)';
 
-    // ── TESTING MODE: Gemini commented out, using HF fallback directly ──────
-    // try {
-    //   // 1. Attempt Primary API (Gemini)
-    //   const model = genAI.getGenerativeModel({ model: MODEL });
-    //   const result = await model.generateContent([...imageParts, { text: promptText }]);
-    //   answer = result.response.text().trim();
-    // } catch (geminiError: any) {
-    //   const gErr = geminiError.message || String(geminiError);
-    //   console.warn('Gemini API failed:', gErr);
+    // ── Gemini COMMENTED OUT — running on Gemma 4 via OpenRouter ─────────────
+    // const geminiModel = genAI.getGenerativeModel({ model: MODEL });
+    // const geminiResult = await geminiModel.generateContent([...imageParts, { text: promptText }]);
+    // answer = geminiResult.response.text().trim();
+    // usedModel = MODEL;
 
-    // 2. Fallback to Cloud Llama Vision (HF)
     try {
-      fallbackTriggered = true;
-      usedModel = 'llama-3.2-11b-vision (huggingface)';
-      answer = await callGemmaCloudFallback(promptText, imageParts);
-    } catch (gemmaError: any) {
-      const hfErr = gemmaError.message || String(gemmaError);
-      const cause = gemmaError.cause ? ` (Cause: ${gemmaError.cause.message})` : '';
-      throw new Error(`HuggingFace Fallback failed: ${hfErr}${cause}`);
+      answer = await callGemma4Cloud(promptText, imageParts);
+    } catch (err: any) {
+      const cause = err.cause ? ` (Cause: ${err.cause.message})` : '';
+      throw new Error(`Gemma 4 (OpenRouter) failed: ${err.message}${cause}`);
     }
-    // }
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
@@ -245,7 +240,6 @@ export async function POST(request: NextRequest) {
       execution_summary: {
         task: TASK_LABELS[task],
         model: usedModel,
-        fallback_used: fallbackTriggered,
         rs_adaptation: 'System rules enforced for satellite validity and domain terminology.',
         mode,
         image_count: imageParts.length,
