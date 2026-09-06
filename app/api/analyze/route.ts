@@ -3,9 +3,47 @@ import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 export const maxDuration = 60; // Allow Vercel to run up to 60s (prevents 'fetch failed' timeouts)
 
-// ── Gemini setup ──────────────────────────────────────────────────────────────
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 const MODEL = 'gemini-3.7-flash';
+
+// ── Gemini key pool (GEMINI_KEY_1 … GEMINI_KEY_20) ───────────────────────────
+// Add keys to Vercel env vars as GEMINI_KEY_1, GEMINI_KEY_2, ... GEMINI_KEY_20
+// The system tries each key in order and auto-switches if one fails/is rate-limited.
+function getGeminiKeys(): string[] {
+  const keys: string[] = [];
+  for (let i = 1; i <= 20; i++) {
+    const key = process.env[`GEMINI_KEY_${i}`]?.trim();
+    if (key) keys.push(key);
+  }
+  return keys;
+}
+
+async function callGeminiWithRotation(imageParts: Part[], promptText: string): Promise<{ answer: string; keyIndex: number }> {
+  const keys = getGeminiKeys();
+  if (keys.length === 0) {
+    throw new Error('No Gemini API keys configured. Add GEMINI_KEY_1 … GEMINI_KEY_20 to your Vercel environment variables.');
+  }
+
+  const errors: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      const genAI = new GoogleGenerativeAI(keys[i]);
+      const model = genAI.getGenerativeModel({ model: MODEL });
+      const result = await model.generateContent([...imageParts, { text: promptText }]);
+      const answer = result.response.text().trim();
+      return { answer, keyIndex: i + 1 }; // success — return immediately
+    } catch (err: any) {
+      const msg = err.message || String(err);
+      console.warn(`Gemini key ${i + 1} failed: ${msg}`);
+      errors.push(`Key ${i + 1}: ${msg}`);
+      // Only retry on quota/rate-limit errors — fail fast on auth or bad-request errors
+      const isRetryable = /quota|rate.limit|429|503|overload|resource.exhausted/i.test(msg);
+      if (!isRetryable) break;
+    }
+  }
+
+  throw new Error(`All ${keys.length} Gemini key(s) failed.\n${errors.join('\n')}`);
+}
+
 
 // ── Remote Sensing system prompt ──────────────────────────────────────────────
 const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst specializing in:
@@ -131,48 +169,6 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
   return scores[best] > 0 ? best : 'single_vqa';
 }
 
-// ── Hugging Face API (Localhost Testing) ──────────────────────────────────────
-async function callHuggingFace(prompt: string, imageParts: Part[]) {
-  // We'll reuse the GROQ_API_KEY env variable name just to keep it simple. 
-  // Put your Hugging Face key (hf_...) in the GROQ_API_KEY variable locally in your .env.local
-  const HF_API_KEY = process.env.GROQ_API_KEY?.trim();
-
-  if (!HF_API_KEY) {
-    throw new Error('Hugging Face API key is not set in environment variables.');
-  }
-
-  const contentParts: object[] = [{ type: 'text', text: prompt }];
-  imageParts.forEach(part => {
-    contentParts.push({
-      type: 'image_url',
-      image_url: {
-        url: `data:${(part as any).inlineData.mimeType};base64,${(part as any).inlineData.data}`
-      }
-    });
-  });
-
-  const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${HF_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'meta-llama/Llama-3.2-11B-Vision-Instruct', 
-      messages: [{ role: 'user', content: contentParts }],
-      max_tokens: 1024,
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Hugging Face API Error ${response.status}: ${errText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content.trim();
-}
-
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const start = Date.now();
@@ -207,22 +203,8 @@ export async function POST(request: NextRequest) {
     const promptTemplate = PROMPTS[task] || PROMPTS.single_vqa;
     const promptText = `${RS_SYSTEM}\n\nTask: ${promptTemplate.replace('{query}', query)}`;
 
-    let answer = '';
-    let usedModel = 'llama-3.2-11b-vision (huggingface)';
-
-    // ── TESTING: Gemini commented out — running solely on Hugging Face ──────────
-    // try {
-    //   const geminiModel = genAI.getGenerativeModel({ model: MODEL });
-    //   const geminiResult = await geminiModel.generateContent([...imageParts, { text: promptText }]);
-    //   answer = geminiResult.response.text().trim();
-    // } catch (geminiError: any) { ... }
-
-    try {
-      answer = await callHuggingFace(promptText, imageParts);
-    } catch (err: any) {
-      const cause = err.cause ? ` (Cause: ${err.cause.message})` : '';
-      throw new Error(`Hugging Face failed: ${err.message}${cause}`);
-    }
+    // ── Key rotation: tries GEMINI_KEY_1 → GEMINI_KEY_2 → … → GEMINI_KEY_20 ──
+    const { answer, keyIndex } = await callGeminiWithRotation(imageParts, promptText);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
@@ -230,7 +212,7 @@ export async function POST(request: NextRequest) {
       answer,
       execution_summary: {
         task: TASK_LABELS[task],
-        model: 'llama-4-scout-17b (groq)',
+        model: `${MODEL} (key ${keyIndex})`,
         rs_adaptation: 'System rules enforced for satellite validity and domain terminology.',
         mode,
         image_count: imageParts.length,
