@@ -5,12 +5,12 @@ export const maxDuration = 60; // Allow Vercel to run up to 60s (prevents 'fetch
 
 const MODEL = 'gemini-3.7-flash';
 
-// ── Gemini key pool (GEMINI_KEY_1 … GEMINI_KEY_20) ───────────────────────────
-// Add keys to Vercel env vars as GEMINI_KEY_1, GEMINI_KEY_2, ... GEMINI_KEY_20
+// ── Gemini key pool (GEMINI_KEY_1 … GEMINI_KEY_21) ───────────────────────────
+// Add keys to Vercel env vars as GEMINI_KEY_1, GEMINI_KEY_2, ... GEMINI_KEY_21
 // The system tries each key in order and auto-switches if one fails/is rate-limited.
 function getGeminiKeys(): string[] {
   const keys: string[] = [];
-  for (let i = 1; i <= 20; i++) {
+  for (let i = 1; i <= 21; i++) {
     const key = process.env[`GEMINI_KEY_${i}`]?.trim();
     if (key) keys.push(key);
   }
@@ -20,7 +20,7 @@ function getGeminiKeys(): string[] {
 async function callGeminiWithRotation(imageParts: Part[], promptText: string): Promise<{ answer: string; keyIndex: number }> {
   const keys = getGeminiKeys();
   if (keys.length === 0) {
-    throw new Error('No Gemini API keys configured. Add GEMINI_KEY_1 … GEMINI_KEY_20 to your Vercel environment variables.');
+    throw new Error('No Gemini API keys configured. Add GEMINI_KEY_1 … GEMINI_KEY_21 to your Vercel environment variables.');
   }
 
   const errors: string[] = [];
