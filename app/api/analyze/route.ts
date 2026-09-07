@@ -17,7 +17,7 @@ function getGeminiKeys(): string[] {
   return keys;
 }
 
-async function callGeminiWithRotation(imageParts: Part[], promptText: string): Promise<{ answer: string; keyIndex: number }> {
+async function callGeminiWithRotation(imageParts: Part[], promptText: string): Promise<{ answer: string; keyIndex: number; tokensUsed: number }> {
   const keys = getGeminiKeys();
   if (keys.length === 0) {
     throw new Error('No Gemini API keys configured. Add GEMINI_KEY_1 … GEMINI_KEY_21 to your Vercel environment variables.');
@@ -30,7 +30,8 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
       const model = genAI.getGenerativeModel({ model: MODEL });
       const result = await model.generateContent([...imageParts, { text: promptText }]);
       const answer = result.response.text().trim();
-      return { answer, keyIndex: i + 1 }; // success — return immediately
+      const tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
+      return { answer, keyIndex: i + 1, tokensUsed }; // success — return immediately
     } catch (err: any) {
       const msg = err.message || String(err);
       console.warn(`Gemini key ${i + 1} failed: ${msg}`);
@@ -203,8 +204,8 @@ export async function POST(request: NextRequest) {
     const promptTemplate = PROMPTS[task] || PROMPTS.single_vqa;
     const promptText = `${RS_SYSTEM}\n\nTask: ${promptTemplate.replace('{query}', query)}`;
 
-    // ── Key rotation: tries GEMINI_KEY_1 → GEMINI_KEY_2 → … → GEMINI_KEY_20 ──
-    const { answer, keyIndex } = await callGeminiWithRotation(imageParts, promptText);
+    // ── Key rotation: tries GEMINI_KEY_1 → GEMINI_KEY_2 → … → GEMINI_KEY_21 ──
+    const { answer, keyIndex, tokensUsed } = await callGeminiWithRotation(imageParts, promptText);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
@@ -217,6 +218,7 @@ export async function POST(request: NextRequest) {
         mode,
         image_count: imageParts.length,
         elapsed_seconds: parseFloat(elapsed),
+        tokens_used: tokensUsed,
       },
     });
   } catch (err: unknown) {

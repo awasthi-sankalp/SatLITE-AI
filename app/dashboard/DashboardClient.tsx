@@ -21,6 +21,7 @@ interface ExecutionSummary {
   images: { filename: string; dimensions: string; format: string }[];
   query: string;
   elapsed_seconds: number;
+  tokens_used: number;
 }
 
 interface AnalysisResult {
@@ -78,6 +79,7 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [tokensRemaining, setTokensRemaining] = useState(21000000);
 
   // Update slot count when mode changes
   const handleModeChange = (m: Mode) => {
@@ -174,6 +176,9 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       setResult(data);
+      if (data.execution_summary?.tokens_used) {
+        setTokensRemaining((prev) => prev - data.execution_summary.tokens_used);
+      }
       setSummaryOpen(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unknown error occurred.');
@@ -378,6 +383,12 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
           )}
         </div>
       )}
+
+      {/* ── Token Debugger ── */}
+      <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium">
+        Tokens Remaining: {tokensRemaining.toLocaleString()}
+      </div>
+
     </div>
   );
 }
