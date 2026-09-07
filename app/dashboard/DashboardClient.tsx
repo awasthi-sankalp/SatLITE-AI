@@ -143,13 +143,12 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
   });
 };
 
-  const handleFile = useCallback(async (index: number, file: File) => {
-    const resizedFile = await resizeImage(file);
-    const preview = URL.createObjectURL(resizedFile);
+  const handleFile = useCallback((index: number, file: File) => {
+    const preview = URL.createObjectURL(file);
     const label = MODES.find((m2) => m2.id === mode)!.slots[index];
     setSlots((prev) => {
       const next = [...prev];
-      next[index] = { file: resizedFile, preview, label };
+      next[index] = { file, preview, label };
       return next;
     });
   }, [mode]);
@@ -186,11 +185,36 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
     setResult(null);
 
     try {
+      // ── 1. Pre-flight query check ──
+      let maxWidth = 512; // Eco Mode Default
+      try {
+        const classRes = await fetch('/api/classify-query', {
+          method: 'POST',
+          body: JSON.stringify({ query }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (classRes.ok) {
+          const classData = await classRes.json();
+          if (classData.resolution === 'HIGH') maxWidth = 1024;
+        }
+      } catch (e) {
+        console.warn('Pre-flight classification failed, defaulting to Eco Mode', e);
+      }
+
+      // ── 2. Compress Images Dynamically ──
+      const resizedFiles = await Promise.all(
+        slots.map(async (slot) => {
+          if (!slot) return null;
+          return await resizeImage(slot.file, maxWidth);
+        })
+      );
+
+      // ── 3. Build & Send Form ──
       const form = new FormData();
       form.append('query', query);
       form.append('mode', mode);
-      for (const slot of slots) {
-        if (slot) form.append('images', slot.file);
+      for (const file of resizedFiles) {
+        if (file) form.append('images', file);
       }
 
       const res = await fetch('/api/analyze', { method: 'POST', body: form });

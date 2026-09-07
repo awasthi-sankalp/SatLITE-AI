@@ -55,76 +55,49 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
 
 
 // ── Remote Sensing system prompt ──────────────────────────────────────────────
-const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst specializing in:
-- Satellite imagery interpretation (optical, multispectral, SAR)
-- Land-use and land-cover (LULC) classification
-- Change detection between multi-temporal images
-- SAR (Synthetic Aperture Radar) and optical image fusion
-- Visual question answering over geospatial imagery
+const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst.
 
-CRITICAL RULES (YOU MUST FOLLOW THESE STRICTLY):
-1. IMAGE VALIDATION: Verify that the uploaded image(s) are actual satellite, aerial, or remote sensing images. If ANY image is a normal photograph, selfie, screenshot, meme, or unrelated picture, you MUST reply EXACTLY with: "Error: This is not a valid satellite image." and STOP your analysis immediately.
-2. QUERY VALIDATION: You are strictly an Earth Observation AI. If the user's query is unrelated to the provided satellite images or remote sensing (e.g., general knowledge, coding, chatting), you MUST reply EXACTLY with: "Error: I can only answer questions related to satellite image analysis." and STOP.
-3. CONCISENESS: Be highly concise. Omit all conversational filler like "Here is the analysis" or "Based on the image". Get straight to the professional data.
-
-If both the image and query are valid, provide precise, evidence-grounded answers using domain-specific terminology (e.g., backscatter, spectral bands, NDVI, built-up area). State your confidence level (High/Medium/Low) when relevant.`;
+CRITICAL RULES:
+1. IMAGE VALIDATION: If the image is not a satellite, aerial, or remote sensing image, reply EXACTLY: "Error: This is not a valid satellite image." and STOP.
+2. QUERY VALIDATION: If the query is unrelated to earth observation, reply EXACTLY: "Error: I can only answer questions related to satellite image analysis." and STOP.
+3. ABSOLUTE CONCISENESS: Output ONLY the requested data. Use highly dense bullet points. Omit ALL conversational filler (e.g., "Here is the analysis", "Based on the image"). Stop generating text immediately once the core question is answered.`;
 
 // ── Task-specific prompt templates ────────────────────────────────────────────
 const PROMPTS: Record<string, string> = {
   single_vqa: `{query}
+Output a direct, exact answer with brief visual evidence.`,
 
-Analyze this satellite/aerial image carefully. Provide:
-- Direct answer to the question
-- Supporting visual evidence from the image
-- Confidence level (High/Medium/Low)`,
-
-  single_caption: `Provide a detailed remote sensing scene description.
-
-Include:
-1. Overall scene type (urban, agricultural, forested, coastal, etc.)
-2. Major land-cover classes and their approximate spatial distribution
-3. Notable objects or structures (roads, buildings, water bodies, vegetation)
-4. Any anomalies or points of interest
-
-Query context: {query}`,
+  single_caption: `{query}
+Output highly dense bullet points:
+- Scene type
+- Major land-cover
+- Notable objects
+- Anomalies`,
 
   single_grounding: `{query}
+Describe spatial location of requested features using directional terms and approximate proportions.`,
 
-Identify and describe the spatial location of the requested feature(s).
-Use directional terms (top-left, center, bottom-right) and approximate
-proportion of the image the feature occupies.`,
-
-  change_description: `You are given two satellite images of the SAME area at DIFFERENT times.
-Image 1 = earlier date. Image 2 = later date.
-
+  change_description: `Images: 1 (earlier) and 2 (later).
 {query}
+Perform change analysis via dense bullet points:
+- Summary of changes
+- Change Type
+- Location
+- Magnitude
+- Confidence`,
 
-Perform change analysis:
-1. **Summary**: Most significant changes observed
-2. **Change Type**: Urban expansion, deforestation, flooding, agricultural change, etc.
-3. **Location**: Where in the image did changes occur?
-4. **Magnitude**: Minor / Moderate / Major
-5. **Confidence**: High / Medium / Low`,
-
-  change_vqa: `You are given two satellite images of the SAME area at DIFFERENT times.
-Image 1 = earlier date. Image 2 = later date.
-
+  change_vqa: `Images: 1 (earlier) and 2 (later).
 {query}
+Answer directly based on comparative visual evidence.`,
 
-Answer directly based on comparing both images with visual evidence.`,
-
-  cross_modal: `You are given two co-registered images of the SAME area:
-- Image 1: Optical/Multispectral satellite image
-- Image 2: SAR (Synthetic Aperture Radar) image
-
+  cross_modal: `Images: 1 (Optical) and 2 (SAR).
 {query}
-
-Provide joint cross-modal analysis:
-1. **Optical Analysis**: Land cover, color, texture visible
-2. **SAR Analysis**: Backscatter patterns, surface roughness, double-bounce from buildings, water specular reflection
-3. **Fusion Insights**: What combining both modalities reveals
-4. **Feature Identification**: Identify requested features using both sources
-5. **Confidence**: Per-feature confidence level`,
+Provide joint cross-modal analysis via dense bullet points:
+- Optical features
+- SAR features
+- Fusion insights
+- Target Identification
+- Confidence`,
 };
 
 // ── Task Classifier (TypeScript port) ─────────────────────────────────────────
