@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Mode = 'single' | 'bitemporal' | 'crossmodal';
@@ -79,7 +79,17 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [tokensRemaining, setTokensRemaining] = useState(21000000);
+  const [tokensRemaining, setTokensRemaining] = useState<number | null>(null);
+
+  // Load tokens from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('satlite_tokens_remaining');
+    if (saved) {
+      setTokensRemaining(parseInt(saved, 10));
+    } else {
+      setTokensRemaining(21000000);
+    }
+  }, []);
 
   // Update slot count when mode changes
   const handleModeChange = (m: Mode) => {
@@ -177,7 +187,11 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       setResult(data);
       if (data.execution_summary?.tokens_used) {
-        setTokensRemaining((prev) => prev - data.execution_summary.tokens_used);
+        setTokensRemaining((prev) => {
+          const next = (prev ?? 21000000) - data.execution_summary.tokens_used;
+          localStorage.setItem('satlite_tokens_remaining', next.toString());
+          return next;
+        });
       }
       setSummaryOpen(false);
     } catch (e: unknown) {
@@ -385,9 +399,11 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       )}
 
       {/* ── Token Debugger ── */}
-      <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium">
-        Tokens Remaining: {tokensRemaining.toLocaleString()}
-      </div>
+      {tokensRemaining !== null && (
+        <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium">
+          Tokens Remaining: {tokensRemaining.toLocaleString()}
+        </div>
+      )}
 
     </div>
   );
