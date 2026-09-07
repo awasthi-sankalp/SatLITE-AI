@@ -447,8 +447,8 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       {/* ── Token Debugger ── */}
       {tokensRemaining !== null && (
         <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium bg-white/80 p-1 rounded">
-          Tokens Remaining (1m window): {tokensRemaining.toLocaleString()}
-          {(21000000 - tokensRemaining) > 0 && ` | Used Tokens: ${(21000000 - tokensRemaining).toLocaleString()}`}
+          Tokens Remaining (1m window): {tokensRemaining.toLocaleString('en-IN')}
+          {(21000000 - tokensRemaining) > 0 && ` | Used Tokens: ${(21000000 - tokensRemaining).toLocaleString('en-IN')}`}
         </div>
       )}
 
