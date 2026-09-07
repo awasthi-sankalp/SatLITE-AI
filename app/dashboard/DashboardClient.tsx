@@ -79,15 +79,26 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [tokensRemaining, setTokensRemaining] = useState<number | null>(null);
+  const [tokensUsedToday, setTokensUsedToday] = useState<number | null>(null);
 
-  // Load tokens from local storage on mount
+  // Load tokens from local storage on mount and reset daily
   useEffect(() => {
-    const saved = localStorage.getItem('satlite_tokens_remaining');
-    if (saved) {
-      setTokensRemaining(parseInt(saved, 10));
+    const savedTokens = localStorage.getItem('satlite_tokens_used');
+    const savedDate = localStorage.getItem('satlite_tokens_date');
+    const today = new Date().toDateString();
+
+    if (savedDate !== today) {
+      // It's a new day! Reset usage to 0
+      setTokensUsedToday(0);
+      localStorage.setItem('satlite_tokens_used', '0');
+      localStorage.setItem('satlite_tokens_date', today);
+    } else if (savedTokens) {
+      // Same day, load exact usage
+      setTokensUsedToday(parseInt(savedTokens, 10));
     } else {
-      setTokensRemaining(21000000);
+      // First time setup
+      setTokensUsedToday(0);
+      localStorage.setItem('satlite_tokens_date', today);
     }
   }, []);
 
@@ -187,9 +198,9 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       setResult(data);
       if (typeof data.execution_summary?.tokens_used === 'number') {
-        setTokensRemaining((prev) => {
-          const next = (prev ?? 21000000) - data.execution_summary.tokens_used;
-          localStorage.setItem('satlite_tokens_remaining', next.toString());
+        setTokensUsedToday((prev) => {
+          const next = (prev ?? 0) + data.execution_summary.tokens_used;
+          localStorage.setItem('satlite_tokens_used', next.toString());
           return next;
         });
       }
@@ -399,9 +410,9 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       )}
 
       {/* ── Token Debugger ── */}
-      {tokensRemaining !== null && (
+      {tokensUsedToday !== null && (
         <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium">
-          Tokens Remaining: {tokensRemaining.toLocaleString()}
+          Tokens Used Today: {tokensUsedToday.toLocaleString()}
         </div>
       )}
 
