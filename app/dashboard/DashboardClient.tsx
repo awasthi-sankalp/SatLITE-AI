@@ -79,28 +79,39 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [tokensUsedToday, setTokensUsedToday] = useState<number | null>(null);
+  
+  // Rolling 60-second token history
+  const [tokenHistory, setTokenHistory] = useState<{ts: number, val: number}[]>([]);
+  const [tokensRemaining, setTokensRemaining] = useState<number>(21000000);
 
-  // Load tokens from local storage on mount and reset daily
   useEffect(() => {
-    const savedTokens = localStorage.getItem('satlite_tokens_used');
-    const savedDate = localStorage.getItem('satlite_tokens_date');
-    const today = new Date().toDateString();
-
-    if (savedDate !== today) {
-      // It's a new day! Reset usage to 0
-      setTokensUsedToday(0);
-      localStorage.setItem('satlite_tokens_used', '0');
-      localStorage.setItem('satlite_tokens_date', today);
-    } else if (savedTokens) {
-      // Same day, load exact usage
-      setTokensUsedToday(parseInt(savedTokens, 10));
-    } else {
-      // First time setup
-      setTokensUsedToday(0);
-      localStorage.setItem('satlite_tokens_date', today);
+    // Load history on mount
+    const saved = localStorage.getItem('satlite_token_history');
+    if (saved) {
+      try { setTokenHistory(JSON.parse(saved)); } catch(e) {}
     }
+
+    // Check every second to remove tokens older than 60 seconds
+    const interval = setInterval(() => {
+      setTokenHistory(prev => {
+        const now = Date.now();
+        const valid = prev.filter(x => now - x.ts < 60000);
+        if (valid.length !== prev.length) {
+          localStorage.setItem('satlite_token_history', JSON.stringify(valid));
+          return valid;
+        }
+        return prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
+
+  // Recalculate remaining pool (1M TPM * 21 keys = 21M)
+  useEffect(() => {
+    const used = tokenHistory.reduce((acc, curr) => acc + curr.val, 0);
+    setTokensRemaining(21000000 - used);
+  }, [tokenHistory]);
 
   // Update slot count when mode changes
   const handleModeChange = (m: Mode) => {
@@ -222,9 +233,9 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       setResult(data);
       if (typeof data.execution_summary?.tokens_used === 'number') {
-        setTokensUsedToday((prev) => {
-          const next = (prev ?? 0) + data.execution_summary.tokens_used;
-          localStorage.setItem('satlite_tokens_used', next.toString());
+        setTokenHistory(prev => {
+          const next = [...prev, { ts: Date.now(), val: data.execution_summary.tokens_used }];
+          localStorage.setItem('satlite_token_history', JSON.stringify(next));
           return next;
         });
       }
@@ -434,9 +445,10 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       )}
 
       {/* ── Token Debugger ── */}
-      {tokensUsedToday !== null && (
-        <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium">
-          Tokens Used Today: {tokensUsedToday.toLocaleString()}
+      {tokensRemaining !== null && (
+        <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium bg-white/80 p-1 rounded">
+          Tokens Remaining (1m window): {tokensRemaining.toLocaleString()}
+          {(21000000 - tokensRemaining) > 0 && ` | Used Tokens: ${(21000000 - tokensRemaining).toLocaleString()}`}
         </div>
       )}
 
