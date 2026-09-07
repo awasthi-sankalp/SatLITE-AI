@@ -186,7 +186,7 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       setResult(data);
-      if (data.execution_summary?.tokens_used) {
+      if (typeof data.execution_summary?.tokens_used === 'number') {
         setTokensRemaining((prev) => {
           const next = (prev ?? 21000000) - data.execution_summary.tokens_used;
           localStorage.setItem('satlite_tokens_remaining', next.toString());

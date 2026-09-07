@@ -30,7 +30,15 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
       const model = genAI.getGenerativeModel({ model: MODEL });
       const result = await model.generateContent([...imageParts, { text: promptText }]);
       const answer = result.response.text().trim();
-      const tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
+      
+      let tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
+      if (tokensUsed === 0) {
+        // Fallback estimate: 258 tokens per image + ~1.5 tokens per word of text
+        const imageTokens = imageParts.length * 258;
+        const textTokens = Math.ceil((promptText.split(' ').length + answer.split(' ').length) * 1.5);
+        tokensUsed = imageTokens + textTokens;
+      }
+      
       return { answer, keyIndex: i + 1, tokensUsed }; // success — return immediately
     } catch (err: any) {
       const msg = err.message || String(err);
