@@ -80,6 +80,9 @@ export default function DashboardClient() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   
+  const [markedImage, setMarkedImage] = useState<string | null>(null);
+  const [cleanAnswer, setCleanAnswer] = useState<string | null>(null);
+
   // Rolling 60-second token history
   const [tokenHistory, setTokenHistory] = useState<{ts: number, val: number}[]>([]);
   const [tokensRemaining, setTokensRemaining] = useState<number>(21000000);
@@ -120,6 +123,8 @@ export default function DashboardClient() {
     setSlots(Array(slotCount).fill(null));
     setResult(null);
     setError(null);
+    setMarkedImage(null);
+    setCleanAnswer(null);
   };
 
 const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
@@ -151,6 +156,75 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
     };
     reader.onerror = () => resolve(file);
     reader.readAsDataURL(file);
+  });
+};
+
+const processMarkedImage = async (originalFile: File, answerText: string) => {
+  // Regex to find Gemini 1.5 bounding boxes: [ymin, xmin, ymax, xmax] Optional Label
+  const boxRegex = /\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]([^\n]*)/g;
+  const boxes: {ymin: number, xmin: number, ymax: number, xmax: number, label: string}[] = [];
+  let match;
+
+  while ((match = boxRegex.exec(answerText)) !== null) {
+    boxes.push({
+      ymin: parseInt(match[1]),
+      xmin: parseInt(match[2]),
+      ymax: parseInt(match[3]),
+      xmax: parseInt(match[4]),
+      label: match[5] ? match[5].replace(/^[^\w]+/, '').trim() : ''
+    });
+  }
+
+  if (boxes.length === 0) {
+    return { cleanText: answerText, markedUrl: null };
+  }
+
+  // Strip bounding boxes from the text that will be shown to the user
+  const cleanText = answerText.replace(/\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\]/g, '').trim();
+
+  return new Promise<{cleanText: string, markedUrl: string | null}>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve({ cleanText, markedUrl: null });
+
+      ctx.drawImage(img, 0, 0);
+
+      boxes.forEach(box => {
+        const y = (box.ymin / 1000) * canvas.height;
+        const x = (box.xmin / 1000) * canvas.width;
+        const h = ((box.ymax - box.ymin) / 1000) * canvas.height;
+        const w = ((box.xmax - box.xmin) / 1000) * canvas.width;
+
+        // Draw bounding box
+        ctx.strokeStyle = '#3b82f6'; // blue-500
+        ctx.lineWidth = Math.max(3, canvas.width / 300);
+        ctx.strokeRect(x, y, w, h);
+
+        // Draw label
+        if (box.label) {
+          const fontSize = Math.max(16, canvas.width / 50);
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          const textWidth = ctx.measureText(box.label).width;
+          const textHeight = fontSize;
+
+          // Label background
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(x, y - textHeight - 8, textWidth + 16, textHeight + 8);
+
+          // Label text
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(box.label, x + 8, y - 8);
+        }
+      });
+
+      resolve({ cleanText, markedUrl: canvas.toDataURL('image/jpeg', 0.9) });
+    };
+    img.onerror = () => resolve({ cleanText, markedUrl: null });
+    img.src = URL.createObjectURL(originalFile);
   });
 };
 
@@ -194,6 +268,8 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setMarkedImage(null);
+    setCleanAnswer(null);
 
     try {
       // ── 1. Pre-flight query check ──
@@ -231,6 +307,16 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
       const res = await fetch('/api/analyze', { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
+      
+      if (slots[0]?.file && data.answer) {
+        const { cleanText, markedUrl } = await processMarkedImage(slots[0].file, data.answer);
+        setCleanAnswer(cleanText);
+        setMarkedImage(markedUrl);
+      } else {
+        setCleanAnswer(data.answer);
+        setMarkedImage(null);
+      }
+      
       setResult(data);
       if (typeof data.execution_summary?.tokens_used === 'number') {
         setTokenHistory(prev => {
@@ -390,8 +476,18 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
           </p>
 
           <div className="text-sm leading-relaxed whitespace-pre-wrap text-black mb-6">
-            {result.answer}
+            {cleanAnswer || result.answer}
           </div>
+          
+          {markedImage && (
+            <div className="mb-6">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-black opacity-80 mb-2 border-b pb-1">
+                Visual Marking
+              </h3>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={markedImage} alt="Marked result" className="max-w-full rounded border border-gray-300" />
+            </div>
+          )}
 
           {/* Execution Summary Accordion */}
           <button
