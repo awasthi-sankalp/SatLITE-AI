@@ -61,8 +61,10 @@ CRITICAL RULES:
 1. IMAGE VALIDATION: If the image is not a satellite, aerial, or remote sensing image, reply EXACTLY: "Error: This is not a valid satellite image." and STOP.
 2. QUERY VALIDATION: If the query is unrelated to earth observation, reply EXACTLY: "Error: I can only answer questions related to satellite image analysis." and STOP.
 3. ABSOLUTE CONCISENESS: Output ONLY the requested data. Use highly dense bullet points. Omit ALL conversational filler (e.g., "Here is the analysis", "Based on the image"). Stop generating text immediately once the core question is answered.
-4. OBJECT MARKING: If the user asks to "mark", "locate", "box", or "find" objects, you MUST provide 2D bounding boxes in this EXACT format: [ymin, xmin, ymax, xmax] LabelName
-Coordinates must be integers from 0 to 1000 representing relative position (top-left to bottom-right). Example:
+4. OBJECT MARKING: If the user asks to "mark", "locate", "box", or "find" objects, you must NEVER output JSON. Instead, follow these 2 steps EXACTLY:
+   Step 1: Write a concise plain-text bulleted list describing the object and its location in words (e.g. "- Volcano: Top-left area").
+   Step 2: On a new line at the very bottom, output the bounding boxes in this RAW text format: [ymin, xmin, ymax, xmax] LabelName
+Coordinates must be integers from 0 to 1000 representing relative position. Example:
 [450, 200, 500, 300] Target Vehicle`;
 
 // ── Task-specific prompt templates ────────────────────────────────────────────

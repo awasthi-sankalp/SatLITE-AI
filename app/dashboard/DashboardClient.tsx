@@ -166,12 +166,22 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
   let match;
 
   while ((match = boxRegex.exec(answerText)) !== null) {
+    let rawLabel = match[5] ? match[5].trim() : '';
+    // Handle case where Gemini forced JSON output e.g. `{"box_2d": [...], "label": "volcano"}`
+    const jsonLabelMatch = rawLabel.match(/"label"\s*:\s*"([^"]+)"/i);
+    if (jsonLabelMatch) {
+      rawLabel = jsonLabelMatch[1];
+    } else {
+      // Strip leading punctuation and trailing json characters
+      rawLabel = rawLabel.replace(/^[^a-zA-Z0-9]+/, '').replace(/["}\]]+$/, '').trim();
+    }
+
     boxes.push({
       ymin: parseInt(match[1]),
       xmin: parseInt(match[2]),
       ymax: parseInt(match[3]),
       xmax: parseInt(match[4]),
-      label: match[5] ? match[5].replace(/^[^\w]+/, '').trim() : ''
+      label: rawLabel || 'Object'
     });
   }
 
@@ -180,7 +190,18 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
   }
 
   // Strip bounding boxes from the text that will be shown to the user
-  const cleanText = answerText.replace(/\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\]/g, '').trim();
+  let cleanText = answerText
+    .replace(/```json[\s\S]*?```/g, '') // remove any JSON markdown blocks Gemini might hallucinate
+    .replace(/\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\][^\n]*/g, '') // remove the raw box lines
+    .replace(/\[\s*\{\s*\}?\s*\]/g, '') // remove empty JSON array if left behind
+    .replace(/^\[\s*|\s*\]$/g, '') // remove stray opening/closing brackets at the very start/end
+    .replace(/\{\s*\}/g, '') // remove stray empty objects
+    .trim();
+
+  // Fallback if model only returned boxes and no description
+  if (!cleanText || cleanText === '[]' || cleanText === '{}') {
+    cleanText = boxes.map(b => `- ${b.label || 'Object'}`).join('\n');
+  }
 
   return new Promise<{cleanText: string, markedUrl: string | null}>((resolve) => {
     const img = new Image();
