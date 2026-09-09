@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import ClearHash from './ClearHash';
 import DashboardClient from './DashboardClient';
+import logoImg from '../../Logo/logo.jpg';
 
 export default async function Dashboard() {
   const { userId } = await auth();
@@ -18,7 +19,7 @@ export default async function Dashboard() {
       {/* Top Left Corner Logo */}
       <div className="absolute top-6 left-4 sm:left-6 z-50 flex items-center gap-2 animate-fade-in">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.jpg" alt="SatLITE AI Logo" className="w-10 h-10 rounded-full object-cover" />
+        <img src={logoImg.src} alt="SatLITE AI Logo" className="w-10 h-10 rounded-full object-cover" />
         <span className="font-bold text-xl tracking-tight hidden sm:inline">SatLITE AI</span>
       </div>
 
