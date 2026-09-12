@@ -388,7 +388,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
                 onDrop={(e) => handleDrop(i, e)}
                 onDragOver={(e) => e.preventDefault()}
                 onClick={() => fileInputRefs.current[i]?.click()}
-                className="border-2 border-dashed border-gray-300 hover:border-black cursor-pointer transition-colors flex flex-col items-center justify-center py-12 text-center"
+                className="border-2 border-dashed border-gray-600 hover:border-white hover:bg-white/10 cursor-pointer transition-colors flex flex-col items-center justify-center py-12 text-center"
               >
                 <svg className="w-8 h-8 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -417,7 +417,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
           <button
             key={q}
             onClick={() => setQuery(q)}
-            className="text-xs border border-gray-300 px-2 py-1 hover:border-black hover:bg-gray-50 transition-colors text-left leading-snug"
+            className="text-xs border border-gray-600 px-2 py-1 hover:border-white hover:bg-white hover:text-black transition-colors text-left leading-snug"
           >
             {q.length > 60 ? q.slice(0, 57) + '…' : q}
           </button>
