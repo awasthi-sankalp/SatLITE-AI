@@ -22,11 +22,8 @@ html, body {
   scrollbar-gutter: stable;
 }
 
-/* Custom Welcome Landing Page Animation */
 .animate-welcome {
-  /* Slowed down to 2 seconds for a smoother transition, with a 2-second delay */
   animation: welcomeSlideShrinkMobile 2s cubic-bezier(0.25, 1, 0.5, 1) 2s forwards;
-  /* Initial state for mobile: perfectly centered, slightly larger text */
   transform: translateY(35vh) scale(1.1);
   transform-origin: center;
   will-change: transform;
@@ -40,7 +37,6 @@ html, body {
 @media (min-width: 768px) {
   .animate-welcome {
     animation: welcomeSlideShrinkDesktop 2s cubic-bezier(0.25, 1, 0.5, 1) 2s forwards;
-    /* Initial state for desktop: massive 2x text */
     transform: translateY(35vh) scale(2);
   }
 
@@ -65,3 +61,6 @@ html, body {
     transform: translateY(0);
   }
 }
+
+
+

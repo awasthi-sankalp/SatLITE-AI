@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-// ── Types ──────────────────────────────────────────────────────────────────
 type Mode = 'single' | 'bitemporal' | 'crossmodal';
 
 interface ImageSlot {
@@ -29,7 +28,6 @@ interface AnalysisResult {
   execution_summary: ExecutionSummary;
 }
 
-// ── Mode config ─────────────────────────────────────────────────────────────
 const MODES: { id: Mode; label: string; description: string; slots: string[] }[] = [
   {
     id: 'single',
@@ -69,7 +67,6 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
   ],
 };
 
-// ── Component ────────────────────────────────────────────────────────────────
 export default function DashboardClient() {
   const [mode, setMode] = useState<Mode>('single');
   const [slots, setSlots] = useState<(ImageSlot | null)[]>([null]);
@@ -83,18 +80,15 @@ export default function DashboardClient() {
   const [markedImage, setMarkedImage] = useState<string | null>(null);
   const [cleanAnswer, setCleanAnswer] = useState<string | null>(null);
 
-  // Rolling 60-second token history
   const [tokenHistory, setTokenHistory] = useState<{ts: number, val: number}[]>([]);
   const [tokensRemaining, setTokensRemaining] = useState<number>(21000000);
 
   useEffect(() => {
-    // Load history on mount
     const saved = localStorage.getItem('satlite_token_history');
     if (saved) {
       try { setTokenHistory(JSON.parse(saved)); } catch(e) {}
     }
 
-    // Check every second to remove tokens older than 60 seconds
     const interval = setInterval(() => {
       setTokenHistory(prev => {
         const now = Date.now();
@@ -110,13 +104,11 @@ export default function DashboardClient() {
     return () => clearInterval(interval);
   }, []);
 
-  // Recalculate remaining pool (1M TPM * 21 keys = 21M)
   useEffect(() => {
     const used = tokenHistory.reduce((acc, curr) => acc + curr.val, 0);
     setTokensRemaining(21000000 - used);
   }, [tokenHistory]);
 
-  // Update slot count when mode changes
   const handleModeChange = (m: Mode) => {
     setMode(m);
     const slotCount = MODES.find((x) => x.id === m)!.slots.length;
@@ -148,7 +140,7 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
         canvas.toBlob(
           (blob) => blob ? resolve(new File([blob], file.name, { type: 'image/jpeg' })) : resolve(file),
           'image/jpeg',
-          0.85 // Compress to 85% quality JPEG
+          0.85 
         );
       };
       img.onerror = () => resolve(file);
@@ -160,19 +152,16 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
 };
 
 const processMarkedImage = async (originalFile: File, answerText: string) => {
-  // Regex to find Gemini 1.5 bounding boxes: [ymin, xmin, ymax, xmax] Optional Label
   const boxRegex = /\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]([^\n]*)/g;
   const boxes: {ymin: number, xmin: number, ymax: number, xmax: number, label: string}[] = [];
   let match;
 
   while ((match = boxRegex.exec(answerText)) !== null) {
     let rawLabel = match[5] ? match[5].trim() : '';
-    // Handle case where Gemini forced JSON output e.g. `{"box_2d": [...], "label": "volcano"}`
     const jsonLabelMatch = rawLabel.match(/"label"\s*:\s*"([^"]+)"/i);
     if (jsonLabelMatch) {
       rawLabel = jsonLabelMatch[1];
     } else {
-      // Strip leading punctuation and trailing json characters
       rawLabel = rawLabel.replace(/^[^a-zA-Z0-9]+/, '').replace(/["}\]]+$/, '').trim();
     }
 
@@ -189,16 +178,14 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
     return { cleanText: answerText, markedUrl: null };
   }
 
-  // Strip bounding boxes from the text that will be shown to the user
   let cleanText = answerText
-    .replace(/```json[\s\S]*?```/g, '') // remove any JSON markdown blocks Gemini might hallucinate
-    .replace(/\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\][^\n]*/g, '') // remove the raw box lines
-    .replace(/\[\s*\{\s*\}?\s*\]/g, '') // remove empty JSON array if left behind
-    .replace(/^\[\s*|\s*\]$/g, '') // remove stray opening/closing brackets at the very start/end
-    .replace(/\{\s*\}/g, '') // remove stray empty objects
+    .replace(/```json[\s\S]*?```/g, '') 
+    .replace(/\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\][^\n]*/g, '') 
+    .replace(/\[\s*\{\s*\}?\s*\]/g, '') 
+    .replace(/^\[\s*|\s*\]$/g, '') 
+    .replace(/\{\s*\}/g, '') 
     .trim();
 
-  // Fallback if model only returned boxes and no description
   if (!cleanText || cleanText === '[]' || cleanText === '{}') {
     cleanText = boxes.map(b => `- ${b.label || 'Object'}`).join('\n');
   }
@@ -220,23 +207,19 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         const h = ((box.ymax - box.ymin) / 1000) * canvas.height;
         const w = ((box.xmax - box.xmin) / 1000) * canvas.width;
 
-        // Draw bounding box
-        ctx.strokeStyle = '#3b82f6'; // blue-500
+        ctx.strokeStyle = '#3b82f6'; 
         ctx.lineWidth = Math.max(3, canvas.width / 300);
         ctx.strokeRect(x, y, w, h);
 
-        // Draw label
         if (box.label) {
           const fontSize = Math.max(16, canvas.width / 50);
           ctx.font = `bold ${fontSize}px sans-serif`;
           const textWidth = ctx.measureText(box.label).width;
           const textHeight = fontSize;
 
-          // Label background
           ctx.fillStyle = '#3b82f6';
           ctx.fillRect(x, y - textHeight - 8, textWidth + 16, textHeight + 8);
 
-          // Label text
           ctx.fillStyle = '#ffffff';
           ctx.fillText(box.label, x + 8, y - 8);
         }
@@ -293,8 +276,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
     setCleanAnswer(null);
 
     try {
-      // ── 1. Pre-flight query check ──
-      let maxWidth = 512; // Eco Mode Default
+      let maxWidth = 512; 
       try {
         const classRes = await fetch('/api/classify-query', {
           method: 'POST',
@@ -309,7 +291,6 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         console.warn('Pre-flight classification failed, defaulting to Eco Mode', e);
       }
 
-      // ── 2. Compress Images Dynamically ──
       const resizedFiles = await Promise.all(
         slots.map(async (slot) => {
           if (!slot) return null;
@@ -317,7 +298,6 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         })
       );
 
-      // ── 3. Build & Send Form ──
       const form = new FormData();
       form.append('query', query);
       form.append('mode', mode);
@@ -359,7 +339,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 pb-16 pt-4">
 
-      {/* ── Mode Selector ── */}
+      
       <div className="flex gap-2 mb-6 flex-wrap">
         {MODES.map((m2) => (
           <button
@@ -379,7 +359,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         </span>
       </div>
 
-      {/* ── Image Upload Slots ── */}
+      
       <div className={`grid gap-4 mb-6 ${slots.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {currentMode.slots.map((slotLabel, i) => (
           <div key={i}>
@@ -388,7 +368,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
             </p>
             {slots[i] ? (
               <div className="relative border border-gray-300 group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                
                 <img
                   src={slots[i]!.preview}
                   alt={slotLabel}
@@ -435,7 +415,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         ))}
       </div>
 
-      {/* ── Sample Query Chips ── */}
+      
       <div className="flex gap-2 mb-3 flex-wrap">
         {SAMPLE_QUERIES[mode].map((q) => (
           <button
@@ -448,7 +428,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         ))}
       </div>
 
-      {/* ── Query Input ── */}
+      
       <div className="flex gap-2 mb-6">
         <textarea
           value={query}
@@ -479,14 +459,14 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         </button>
       </div>
 
-      {/* ── Error ── */}
+      
       {error && (
         <div className="border border-red-400 bg-red-50 text-red-700 p-4 text-sm mb-6">
           <strong>Error:</strong> {error}
         </div>
       )}
 
-      {/* ── Results ── */}
+      
       {result && (
         <div className="border border-gray-200 p-6 mb-4">
           <h2 className="font-bold text-lg mb-1">Analysis Result</h2>
@@ -505,12 +485,12 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
               <h3 className="text-xs font-bold uppercase tracking-wider text-black opacity-80 mb-2 border-b pb-1">
                 Visual Marking
               </h3>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              
               <img src={markedImage} alt="Marked result" className="max-w-full rounded border border-gray-300" />
             </div>
           )}
 
-          {/* Execution Summary Accordion */}
+          
           <button
             onClick={() => setSummaryOpen((o) => !o)}
             className="flex items-center gap-2 text-xs text-gray-500 hover:text-black transition-colors"
@@ -539,7 +519,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
               </p>
               <p><span className="font-medium">Elapsed:</span> {result.execution_summary.elapsed_seconds}s</p>
 
-              {/* Download JSON report */}
+              
               <button
                 onClick={() => {
                   const blob = new Blob(
@@ -561,7 +541,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         </div>
       )}
 
-      {/* ── Token Debugger ── */}
+      
       {tokensRemaining !== null && (
         <div className="fixed bottom-4 left-4 text-black text-sm z-50 pointer-events-none font-medium bg-white/80 p-1 rounded">
           Tokens Remaining (10L/window): {tokensRemaining.toLocaleString('en-IN')}
@@ -572,3 +552,4 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
     </div>
   );
 }
+

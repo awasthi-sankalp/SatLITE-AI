@@ -11,9 +11,7 @@ import sys
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "test-images")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Public domain NASA / ESA satellite images — direct download URLs
 IMAGES = [
-    # --- Single Image Tests ---
     {
         "name": "india_delhi_urban.jpg",
         "url": "https://eoimages.gsfc.nasa.gov/images/imagerecords/89000/89036/india_oli_2014073_lrg.jpg",
@@ -38,7 +36,6 @@ IMAGES = [
         "description": "Mumbai coastal urban area - Landsat OLI",
         "use": "Single image VQA / urban",
     },
-    # --- Change Detection (Bi-temporal) pair ---
     {
         "name": "change_before_forest.jpg",
         "url": "https://eoimages.gsfc.nasa.gov/images/imagerecords/5000/5765/amazon_tm5_1992227_lrg.jpg",
@@ -93,3 +90,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

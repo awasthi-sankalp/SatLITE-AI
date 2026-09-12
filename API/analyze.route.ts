@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
-export const maxDuration = 60; // Allow Vercel to run up to 60s (prevents 'fetch failed' timeouts)
+export const maxDuration = 60; 
 
 const MODEL = 'gemini-3.7-flash';
 
-// ── Gemini key pool (GEMINI_KEY_1 … GEMINI_KEY_21) ───────────────────────────
-// Add keys to Vercel env vars as GEMINI_KEY_1, GEMINI_KEY_2, ... GEMINI_KEY_21
-// The system tries each key in order and auto-switches if one fails/is rate-limited.
 function getGeminiKeys(): string[] {
   const keys: string[] = [];
   for (let i = 1; i <= 21; i++) {
@@ -33,18 +30,16 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
       
       let tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
       if (tokensUsed === 0) {
-        // Fallback estimate: 258 tokens per image + ~1.5 tokens per word of text
         const imageTokens = imageParts.length * 258;
         const textTokens = Math.ceil((promptText.split(' ').length + answer.split(' ').length) * 1.5);
         tokensUsed = imageTokens + textTokens;
       }
       
-      return { answer, keyIndex: i + 1, tokensUsed }; // success — return immediately
+      return { answer, keyIndex: i + 1, tokensUsed }; 
     } catch (err: any) {
       const msg = err.message || String(err);
       console.warn(`Gemini key ${i + 1} failed: ${msg}`);
       errors.push(`Key ${i + 1}: ${msg}`);
-      // Only retry on quota/rate-limit errors — fail fast on auth or bad-request errors
       const isRetryable = /quota|rate.limit|429|503|overload|resource.exhausted/i.test(msg);
       if (!isRetryable) break;
     }
@@ -54,7 +49,6 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
 }
 
 
-// ── Remote Sensing system prompt ──────────────────────────────────────────────
 const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst.
 
 CRITICAL RULES:
@@ -67,7 +61,6 @@ CRITICAL RULES:
 Coordinates must be integers from 0 to 1000 representing relative position. Example:
 [450, 200, 500, 300] Target Vehicle`;
 
-// ── Task-specific prompt templates ────────────────────────────────────────────
 const PROMPTS: Record<string, string> = {
   single_vqa: `{query}
 Output a direct, exact answer with brief visual evidence.`,
@@ -105,7 +98,6 @@ Provide joint cross-modal analysis via dense bullet points:
 - Confidence`,
 };
 
-// ── Task Classifier (TypeScript port) ─────────────────────────────────────────
 type TaskType =
   | 'single_vqa'
   | 'single_caption'
@@ -156,7 +148,6 @@ function classifyTask(query: string, imageCount: number, mode: string): TaskType
   return scores[best] > 0 ? best : 'single_vqa';
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const start = Date.now();
 
@@ -190,7 +181,6 @@ export async function POST(request: NextRequest) {
     const promptTemplate = PROMPTS[task] || PROMPTS.single_vqa;
     const promptText = `${RS_SYSTEM}\n\nTask: ${promptTemplate.replace('{query}', query)}`;
 
-    // ── Key rotation: tries GEMINI_KEY_1 → GEMINI_KEY_2 → … → GEMINI_KEY_21 ──
     const { answer, keyIndex, tokensUsed } = await callGeminiWithRotation(imageParts, promptText);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
@@ -212,3 +202,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+

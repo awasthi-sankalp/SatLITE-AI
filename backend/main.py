@@ -18,7 +18,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow Next.js dev and prod origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -37,3 +36,4 @@ app.include_router(analyze_router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "SatQuery AI Backend"}
+

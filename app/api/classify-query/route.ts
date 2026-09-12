@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const promptText = `Does this remote sensing query require finding, counting, or analyzing very small/tiny objects (e.g., dustbins, cars, individual trees, small buildings)? Reply with exactly "HIGH" if yes, or "LOW" if it is a general landscape/large-scale query (e.g., floods, land cover, weather, generalized change). Query: "${query}"`;
 
     const keys = getGeminiKeys();
-    let answer = 'LOW'; // default safe fallback
+    let answer = 'LOW'; 
     
     for (let i = 0; i < keys.length; i++) {
       try {
@@ -29,11 +29,10 @@ export async function POST(request: NextRequest) {
         const result = await model.generateContent(promptText);
         answer = result.response.text().trim().toUpperCase();
         
-        // Strict parsing
         if (answer.includes('HIGH')) answer = 'HIGH';
         else answer = 'LOW';
         
-        break; // Break on first successful API call
+        break; 
       } catch (err: any) {
         const msg = err.message || String(err);
         const isRetryable = /quota|rate.limit|429|503|overload/i.test(msg);
@@ -43,6 +42,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ resolution: answer });
   } catch (err) {
-    return NextResponse.json({ resolution: 'LOW' }); // Fail safe to eco mode
+    return NextResponse.json({ resolution: 'LOW' }); 
   }
 }
+
+
+

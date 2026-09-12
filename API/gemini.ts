@@ -35,7 +35,6 @@ export async function callGeminiWithRotation(
       
       let tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
       if (tokensUsed === 0) {
-        // Fallback estimate: 258 tokens per image + ~1.5 tokens per word of text
         const imageTokens = imageParts.length * 258;
         const textTokens = Math.ceil((promptText.split(' ').length + answer.split(' ').length) * 1.5);
         tokensUsed = imageTokens + textTokens;
@@ -53,3 +52,5 @@ export async function callGeminiWithRotation(
 
   throw new Error('All ' + keys.length + ' Gemini key(s) failed.\n' + errors.join('\n'));
 }
+
+

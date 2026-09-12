@@ -19,8 +19,7 @@ from transformers import (
     BlipForConditionalGeneration,
 )
 
-# ── Model loading (singleton, loaded once at startup) ──────────────────────
-_DEVICE = "cpu"  # CPU-only — no GPU required
+_DEVICE = "cpu"  
 
 print("[SatQuery AI] Loading BLIP VQA model (first run downloads ~1GB)...")
 _vqa_processor = BlipProcessor.from_pretrained("Salesforce/blip-vqa-base")
@@ -39,9 +38,6 @@ _cap_model.eval()
 print("[SatQuery AI] Models ready.")
 
 
-# ── Remote Sensing Domain Context Prefixes ────────────────────────────────
-# Injected into questions to guide the model with RS domain vocabulary
-# (simulates BigEarthNet.txt prompt-level domain adaptation)
 RS_VQA_PREFIX = (
     "In this satellite/aerial remote sensing image, "
 )
@@ -95,7 +91,6 @@ def _run_caption(image: Image.Image, conditional_text: str = "") -> str:
     return _cap_processor.decode(out[0], skip_special_tokens=True).strip()
 
 
-# ── Public inference function ─────────────────────────────────────────────
 def run_local_model(task: str, images: list[Image.Image], query: str) -> dict:
     """
     Run the appropriate local BLIP model for the given task.
@@ -115,13 +110,11 @@ def run_local_model(task: str, images: list[Image.Image], query: str) -> dict:
     if task == "single_vqa":
         question = RS_VQA_PREFIX + query
         answer = _run_vqa(img, question)
-        # Supplement with a caption for richer context
         cap = _run_caption(img, RS_CAPTION_PREFIX)
         answer = f"**Answer:** {answer}\n\n**Scene context:** {cap}"
         model_used = "blip-vqa-base + blip-image-captioning-base"
 
     elif task == "single_caption":
-        # Use VQA for query-conditioned description, plus unconditional caption
         cap = _run_caption(img, RS_CAPTION_PREFIX)
         q_answer = _run_vqa(img, RS_VQA_PREFIX + query)
         answer = (
@@ -171,3 +164,4 @@ def run_local_model(task: str, images: list[Image.Image], query: str) -> dict:
         "answer": answer,
         "model": model_used,
     }
+

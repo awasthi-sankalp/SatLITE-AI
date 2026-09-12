@@ -15,7 +15,6 @@ class TaskType(str, Enum):
     CROSS_MODAL = "cross_modal"
 
 
-# Keywords that strongly indicate each task
 _TASK_KEYWORDS: dict[TaskType, list[str]] = {
     TaskType.SINGLE_CAPTION: [
         "describe", "caption", "what is in", "scene", "overview", "summary",
@@ -43,7 +42,6 @@ _TASK_KEYWORDS: dict[TaskType, list[str]] = {
     ],
 }
 
-# Default single-image fallback
 _DEFAULT_SINGLE = TaskType.SINGLE_VQA
 
 
@@ -61,25 +59,21 @@ def classify_task(query: str, image_count: int, mode: str) -> TaskType:
     """
     q_lower = query.lower()
 
-    # Mode-driven hard overrides
     if mode == "crossmodal" and image_count == 2:
         return TaskType.CROSS_MODAL
 
     if mode == "bitemporal" and image_count == 2:
-        # Distinguish change VQA vs change description by query structure
         for kw in _TASK_KEYWORDS[TaskType.CHANGE_VQA]:
             if kw in q_lower:
                 return TaskType.CHANGE_VQA
         return TaskType.CHANGE_DESCRIPTION
 
-    # Single image — keyword scoring
     scores: dict[TaskType, int] = {t: 0 for t in TaskType}
     for task, keywords in _TASK_KEYWORDS.items():
         for kw in keywords:
             if kw in q_lower:
                 scores[task] += 1
 
-    # Pick the highest-scoring task type relevant to single image
     single_tasks = [
         TaskType.SINGLE_CAPTION,
         TaskType.SINGLE_GROUNDING,
@@ -90,3 +84,4 @@ def classify_task(query: str, image_count: int, mode: str) -> TaskType:
         return best
 
     return _DEFAULT_SINGLE
+

@@ -29,7 +29,6 @@ def load_image_from_bytes(data: bytes, filename: str) -> Image.Image:
     if ext in ("tif", "tiff", "geotiff"):
         return _load_geotiff(data)
     else:
-        # Standard image formats
         img = Image.open(io.BytesIO(data))
         return img.convert("RGB")
 
@@ -48,17 +47,14 @@ def _load_geotiff(data: bytes) -> Image.Image:
                 count = dataset.count
 
                 if count >= 3:
-                    # Use first 3 bands as R, G, B (typical for multispectral)
                     r = _normalize_band(dataset.read(1).astype(np.float32))
                     g = _normalize_band(dataset.read(2).astype(np.float32))
                     b = _normalize_band(dataset.read(3).astype(np.float32))
                     rgb = np.stack([r, g, b], axis=-1)
                 elif count == 1:
-                    # Single band (e.g., SAR) — replicate as grayscale RGB
                     band = _normalize_band(dataset.read(1).astype(np.float32))
                     rgb = np.stack([band, band, band], axis=-1)
                 else:
-                    # 2-band: use available bands
                     b1 = _normalize_band(dataset.read(1).astype(np.float32))
                     b2 = _normalize_band(dataset.read(2).astype(np.float32))
                     rgb = np.stack([b1, b2, b1], axis=-1)
@@ -66,7 +62,6 @@ def _load_geotiff(data: bytes) -> Image.Image:
                 return Image.fromarray(rgb, mode="RGB")
 
     except ImportError:
-        # rasterio not available — fall back to PIL (basic TIFF support)
         img = Image.open(io.BytesIO(data))
         if img.mode != "RGB":
             img = img.convert("RGB")
@@ -84,3 +79,4 @@ def validate_image_pair(images: list[Image.Image], mode: str) -> tuple[bool, str
     if mode in ("bitemporal", "crossmodal") and count != 2:
         return False, f"{mode.capitalize()} mode requires exactly 2 images, got {count}."
     return True, ""
+

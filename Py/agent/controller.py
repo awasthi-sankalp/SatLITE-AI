@@ -15,7 +15,6 @@ from utils.image_utils import load_image_from_bytes, validate_image_pair
 
 router = APIRouter()
 
-# Human-readable task labels for the execution summary
 TASK_LABELS = {
     TaskType.SINGLE_VQA: "Single-Image Visual Question Answering",
     TaskType.SINGLE_CAPTION: "Single-Image Scene Description & Captioning",
@@ -36,7 +35,7 @@ RS_ADAPTATION_NOTE = (
 @router.post("/analyze")
 async def analyze(
     query: str = Form(...),
-    mode: str = Form("single"),  # 'single' | 'bitemporal' | 'crossmodal'
+    mode: str = Form("single"),  
     images: list[UploadFile] = File(...),
 ):
     """
@@ -45,7 +44,6 @@ async def analyze(
     """
     start_time = time.time()
 
-    # ── 1. Input Validation ────────────────────────────────────────────────
     if not query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
     if not images:
@@ -55,7 +53,6 @@ async def analyze(
     if mode not in ("single", "bitemporal", "crossmodal"):
         raise HTTPException(status_code=400, detail=f"Unknown mode: {mode}")
 
-    # ── 2. Load and Parse Images ───────────────────────────────────────────
     pil_images = []
     image_meta = []
     for upload in images:
@@ -76,15 +73,12 @@ async def analyze(
             "format": (upload.filename or "").rsplit(".", 1)[-1].upper(),
         })
 
-    # ── 3. Validate Image Count vs Mode ───────────────────────────────────
     is_valid, err = validate_image_pair(pil_images, mode)
     if not is_valid:
         raise HTTPException(status_code=422, detail=err)
 
-    # ── 4. Task Classification (Agentic Routing) ──────────────────────────
     task = classify_task(query, len(pil_images), mode)
 
-    # ── 5. Execute Specialist Model via Gemini ────────────────────────────
     try:
         result = run_local_model(task.value, pil_images, query)
     except Exception as e:
@@ -95,7 +89,6 @@ async def analyze(
 
     elapsed = round(time.time() - start_time, 2)
 
-    # ── 6. Build Structured Response ──────────────────────────────────────
     return JSONResponse({
         "answer": result["answer"],
         "execution_summary": {
@@ -110,3 +103,4 @@ async def analyze(
             "elapsed_seconds": elapsed,
         },
     })
+

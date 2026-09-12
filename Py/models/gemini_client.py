@@ -9,13 +9,10 @@ import google.generativeai as genai
 from PIL import Image
 import io
 
-# Configure Gemini with the API key from environment
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY", ""))
 
-# Use Gemini 1.5 Flash — free tier, fast, supports multi-image vision
 MODEL_NAME = "gemini-1.5-flash"
 
-# ── Remote-Sensing System Prompt ──────────────────────────────────────────────
 RS_SYSTEM_PROMPT = """You are SatQuery AI, an expert remote sensing analyst specialized in:
 - Satellite imagery interpretation (optical, multispectral, SAR)
 - Land-use and land-cover (LULC) classification
@@ -27,7 +24,6 @@ Always provide precise, evidence-grounded answers. Use domain-specific terminolo
 (e.g., backscatter, spectral bands, NDVI, built-up area, impervious surface).
 When confidence is not certain, state it explicitly."""
 
-# ── Task-specific prompt templates ────────────────────────────────────────────
 PROMPTS = {
     "single_vqa": """{query}
 
@@ -121,7 +117,6 @@ def run_gemini(task: str, images: list[Image.Image], query: str) -> dict:
     prompt_template = PROMPTS.get(task, PROMPTS["single_vqa"])
     prompt_text = prompt_template.format(query=query)
 
-    # Build content parts: images first, then prompt
     parts = [_pil_to_part(img) for img in images]
     parts.append({"text": prompt_text})
 
@@ -132,3 +127,4 @@ def run_gemini(task: str, images: list[Image.Image], query: str) -> dict:
         "answer": answer,
         "model": MODEL_NAME,
     }
+
