@@ -49,7 +49,7 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
 }
 
 
-const RS_SYSTEM = `You are SatLITE AI, an expert remote sensing analyst.
+const RS_SYSTEM = `You are SatQuery AI, an expert remote sensing analyst.
 
 CRITICAL RULES:
 1. IMAGE VALIDATION: If the image is not a satellite, aerial, or remote sensing image, reply EXACTLY: "Error: This is not a valid satellite image." and STOP.
