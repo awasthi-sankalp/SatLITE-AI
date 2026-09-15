@@ -12,7 +12,7 @@ export default async function Home() {
   }
 
   return (
-    <main className="relative bg-black font-sans text-white min-h-screen w-full px-4 sm:px-6">
+    <main className="relative bg-white font-sans text-black min-h-screen w-full px-4 sm:px-6">
       <BreakLoop />
       
       <div className="absolute top-6 left-4 sm:left-6 z-50 flex items-center gap-2">

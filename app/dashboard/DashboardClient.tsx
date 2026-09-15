@@ -306,17 +306,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
       }
 
       const res = await fetch('/api/analyze', { method: 'POST', body: form });
-      const rawText = await res.text();
-      let data: any;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        throw new Error(
-          res.status === 401 || res.status === 403
-            ? 'Authentication error — please refresh the page or sign in again.'
-            : `Server error (${res.status}): the API returned an unexpected response. Please try again shortly.`
-        );
-      }
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       
       if (slots[0]?.file && data.answer) {
