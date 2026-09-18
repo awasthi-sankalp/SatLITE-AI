@@ -530,7 +530,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = `satquery_report_${Date.now()}.json`;
+                  a.download = `satlite_report_${Date.now()}.json`;
                   a.click();
                 }}
                 className="mt-2 inline-block border border-gray-600 px-3 py-1 hover:border-white text-white transition-colors"

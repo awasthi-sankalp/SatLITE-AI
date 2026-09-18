@@ -469,7 +469,7 @@ if(navEl) {
   const progress = document.getElementById('judgeProgress');
   if(!btn || !caption || !progress) return;
   const steps = [
-    { sel:'#hero', step:'STEP 1 / 6', title:'One query, every sensor', text:'SatQuery AI answers plain-language questions about optical and SAR satellite imagery.' , dur:9000},
+    { sel:'#hero', step:'STEP 1 / 6', title:'One query, every sensor', text:'SatLITE AI answers plain-language questions about optical and SAR satellite imagery.' , dur:9000},
     { sel:'#system', step:'STEP 2 / 6', title:'The problem', text:'Remote-sensing AI today ships as isolated single-task tools — this section shows the fragmentation.', dur:9000 },
     { sel:'#pipeline', step:'STEP 3 / 6', title:'The agentic pipeline', text:'One controller classifies, routes, and audits every step — nothing is a black box.', dur:9000 },
     { sel:'#demo', step:'STEP 4 / 6', title:'Live demo', text:'Pick an input mode and a query, then watch the agent trace execute in real time.', dur:14000 },

@@ -1,5 +1,5 @@
 """
-SatQuery AI — FastAPI Backend Entry Point
+SatLITE AI — FastAPI Backend Entry Point
 Agentic Remote Sensing Vision-Language Assistant
 """
 
@@ -13,7 +13,7 @@ from agent.controller import router as analyze_router
 load_dotenv()
 
 app = FastAPI(
-    title="SatQuery AI Backend",
+    title="SatLITE AI Backend",
     description="Agentic VLM backend for remote sensing image analysis",
     version="1.0.0",
 )
@@ -35,5 +35,5 @@ app.include_router(analyze_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "SatQuery AI Backend"}
+    return {"status": "ok", "service": "SatLITE AI Backend"}
 

@@ -13,7 +13,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY", ""))
 
 MODEL_NAME = "gemini-1.5-flash"
 
-RS_SYSTEM_PROMPT = """You are SatQuery AI, an expert remote sensing analyst specialized in:
+RS_SYSTEM_PROMPT = """You are SatLITE AI, an expert remote sensing analyst specialized in:
 - Satellite imagery interpretation (optical, multispectral, SAR)
 - Land-use and land-cover (LULC) classification
 - Change detection between multi-temporal images

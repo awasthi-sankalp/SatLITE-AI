@@ -1,5 +1,5 @@
 """
-Download sample satellite images for testing SatQuery AI.
+Download sample satellite images for testing SatLITE AI.
 Pulls real images from NASA Earth Observatory (public domain).
 Saves to: public/test-images/
 """
@@ -59,7 +59,7 @@ def download(name: str, url: str, description: str, use: str):
     try:
         print(f"  [↓] Downloading {name}...")
         print(f"      {description}")
-        req = urllib.request.Request(url, headers={"User-Agent": "SatQueryAI/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "SatLITEAI/1.0"})
         with urllib.request.urlopen(req, timeout=30) as response, open(dest, "wb") as f:
             f.write(response.read())
         size_kb = os.path.getsize(dest) // 1024
@@ -71,7 +71,7 @@ def download(name: str, url: str, description: str, use: str):
 
 
 def main():
-    print("\n=== SatQuery AI — Downloading Test Images ===")
+    print("\n=== SatLITE AI — Downloading Test Images ===")
     print(f"Saving to: {os.path.abspath(OUTPUT_DIR)}\n")
 
     success = 0

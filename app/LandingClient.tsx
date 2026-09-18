@@ -13,7 +13,7 @@ export default function LandingClient() {
       <div className="judge-progress" id="judgeProgress"></div>
 
       <nav className="nav" id="nav">
-        <a href="#hero" className="brand"><span className="dot"></span><span>SatQuery AI</span></a>
+        <a href="#hero" className="brand"><span className="dot"></span><span>SatLITE AI</span></a>
         <a href="#hero">Project</a>
         <a href="#system">System</a>
         <a href="#demo">Demo</a>
@@ -31,7 +31,7 @@ export default function LandingClient() {
           <div className="hero-content">
             <div className="hero-eyebrow mono" id="h-eyebrow">Hackathon Project 167 · <b>ISRO / SAC</b> Remote Sensing Challenge</div>
             <h1 id="h-title">Don't select a model.<br/>Just <span className="o">ask the</span> <span className="s">imagery</span>.</h1>
-            <p className="hero-sub" id="h-sub">SatQuery AI is an agentic vision-language assistant for optical and SAR satellite imagery — it routes plain-language questions to the right specialist model and answers with visual evidence.</p>
+            <p className="hero-sub" id="h-sub">SatLITE AI is an agentic vision-language assistant for optical and SAR satellite imagery — it routes plain-language questions to the right specialist model and answers with visual evidence.</p>
             <div className="hero-cta" id="h-cta">
               <a href="#system" className="btn-primary" style={{ textDecoration: 'none' }}>Explore the System</a>
               <a href="#demo" className="btn-ghost" style={{ textDecoration: 'none' }}>See the full demo →</a>
@@ -64,7 +64,7 @@ export default function LandingClient() {
       <section className="landing-section">
       <div className="section-head reveal">
         <div className="section-num"><i></i>02 — OUR APPROACH</div>
-        <h2>SatQuery AI reads the question first.</h2>
+        <h2>SatLITE AI reads the question first.</h2>
         <p>An agentic controller classifies the task, validates the inputs, and routes to the right specialist model — or combination of models — before returning one evidence-grounded response.</p>
       </div>
       <div className="flow reveal" id="flowDiagram">
@@ -169,7 +169,7 @@ export default function LandingClient() {
       </section>
 
       <footer>
-        <p>SATQUERY AI — PROJECT 167 · BUILT FOR AN AGENTIC REMOTE-SENSING VLM CHALLENGE</p>
+        <p>SATLITE AI — PROJECT 167 · BUILT FOR AN AGENTIC REMOTE-SENSING VLM CHALLENGE</p>
       </footer>
 
       <div className="judge-caption" id="judgeCaption">

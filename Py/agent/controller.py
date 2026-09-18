@@ -1,5 +1,5 @@
 """
-Agentic Controller — the brain of SatQuery AI.
+Agentic Controller — the brain of SatLITE AI.
 Receives image uploads + query, validates inputs,
 classifies task, invokes Gemini, returns structured response.
 """

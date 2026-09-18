@@ -21,21 +21,21 @@ from transformers import (
 
 _DEVICE = "cpu"  
 
-print("[SatQuery AI] Loading BLIP VQA model (first run downloads ~1GB)...")
+print("[SatLITE AI] Loading BLIP VQA model (first run downloads ~1GB)...")
 _vqa_processor = BlipProcessor.from_pretrained("Salesforce/blip-vqa-base")
 _vqa_model = BlipForQuestionAnswering.from_pretrained(
     "Salesforce/blip-vqa-base"
 ).to(_DEVICE)
 _vqa_model.eval()
 
-print("[SatQuery AI] Loading BLIP captioning model...")
+print("[SatLITE AI] Loading BLIP captioning model...")
 _cap_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
 _cap_model = BlipForConditionalGeneration.from_pretrained(
     "Salesforce/blip-image-captioning-base"
 ).to(_DEVICE)
 _cap_model.eval()
 
-print("[SatQuery AI] Models ready.")
+print("[SatLITE AI] Models ready.")
 
 
 RS_VQA_PREFIX = (
