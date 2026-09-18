@@ -3,7 +3,7 @@ import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 export const maxDuration = 60; 
 
-const MODEL = 'gemini-3.7-flash';
+const MODEL = 'gemini-2.0-flash';
 
 function getGeminiKeys(): string[] {
   const keys: string[] = [];
