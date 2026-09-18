@@ -20,23 +20,12 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
     throw new Error('No Gemini API keys configured. Add GEMINI_KEY_1 … GEMINI_KEY_21 to your Vercel environment variables.');
   }
 
-  const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
-    Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(`Request timed out after ${ms / 1000}s`)), ms)
-      ),
-    ]);
-
   const errors: string[] = [];
   for (let i = 0; i < keys.length; i++) {
     try {
       const genAI = new GoogleGenerativeAI(keys[i]);
       const model = genAI.getGenerativeModel({ model: MODEL });
-      const result = await withTimeout(
-        model.generateContent([...imageParts, { text: promptText }]),
-        45000
-      );
+      const result = await model.generateContent([...imageParts, { text: promptText }]);
       const answer = result.response.text().trim();
       
       let tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
@@ -60,53 +49,25 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
 }
 
 
-const RS_SYSTEM = `You are SatLITE AI, an expert remote sensing analyst.
-
+const RS_SYSTEM = `You are SatLITE AI, a remote sensing parameter extractor.
 CRITICAL RULES:
-1. IMAGE VALIDATION: If the image is not a satellite, aerial, or remote sensing image, reply EXACTLY: "Error: This is not a valid satellite image." and STOP.
-2. QUERY VALIDATION: If the query is unrelated to earth observation, reply EXACTLY: "Error: I can only answer questions related to satellite image analysis." and STOP.
-3. ABSOLUTE CONCISENESS: Output ONLY the requested data. Use highly dense bullet points. Omit ALL conversational filler (e.g., "Here is the analysis", "Based on the image"). Stop generating text immediately once the core question is answered.
-4. OBJECT MARKING: If the user asks to "mark", "locate", "box", or "find" objects, you must NEVER output JSON. Instead, follow these 2 steps EXACTLY:
-   Step 1: Write a concise plain-text bulleted list describing the object and its location in words (e.g. "- Volcano: Top-left area").
-   Step 2: On a new line at the very bottom, output the bounding boxes in this RAW text format: [ymin, xmin, ymax, xmax] LabelName
-Coordinates must be integers from 0 to 1000 representing relative position. Example:
-[450, 200, 500, 300] Target Vehicle`;
+1. OUTPUT STRICT JSON ONLY. No markdown wrappers (no \`\`\`json), no text outside JSON.
+2. If invalid image, output: {"error": "Not a satellite image."}
+3. Keep text values extremely short (1-3 words max). Tokens are heavily penalized.
+4. If asked to find objects, include a "boxes" array in the JSON. Format: {"boxes": [{"box": [ymin, xmin, ymax, xmax], "label": "ShortLabel"}]}. Coordinates 0-1000.`;
 
 const PROMPTS: Record<string, string> = {
-  single_vqa: `{query}
-Output a direct, exact answer with brief visual evidence.`,
+  single_vqa: `{query}\nOutput JSON format: {"answer": "short fact", "confidence": "High/Med/Low"}`,
 
-  single_caption: `{query}
-Output highly dense bullet points:
-- Scene type
-- Major land-cover
-- Notable objects
-- Anomalies`,
+  single_caption: `{query}\nOutput JSON format: {"scene": "type", "land_cover": "type", "objects": ["obj1", "obj2"], "anomalies": ["none"]}`,
 
-  single_grounding: `{query}
-Provide precise bounding boxes for the requested features using the format: [ymin, xmin, ymax, xmax] LabelName.`,
+  single_grounding: `{query}\nOutput JSON format: {"summary": "found X targets", "boxes": [{"box": [ymin, xmin, ymax, xmax], "label": "..."}]}`,
 
-  change_description: `Images: 1 (earlier) and 2 (later).
-{query}
-Perform change analysis via dense bullet points:
-- Summary of changes
-- Change Type
-- Location
-- Magnitude
-- Confidence`,
+  change_description: `Images: 1 (earlier) and 2 (later). {query}\nOutput JSON format: {"change_type": "type", "location": "where", "magnitude": "High/Low", "confidence": "High/Low", "summary": "short summary"}`,
 
-  change_vqa: `Images: 1 (earlier) and 2 (later).
-{query}
-Answer directly based on comparative visual evidence.`,
+  change_vqa: `Images: 1 (earlier) and 2 (later). {query}\nOutput JSON format: {"answer": "short fact", "confidence": "High/Low"}`,
 
-  cross_modal: `Images: 1 (Optical) and 2 (SAR).
-{query}
-Provide joint cross-modal analysis via dense bullet points:
-- Optical features
-- SAR features
-- Fusion insights
-- Target Identification
-- Confidence`,
+  cross_modal: `Images: 1 (Optical) and 2 (SAR). {query}\nOutput JSON format: {"optical_feat": ["f1"], "sar_feat": ["f1"], "fusion": "insight", "confidence": "High/Low"}`,
 };
 
 type TaskType =

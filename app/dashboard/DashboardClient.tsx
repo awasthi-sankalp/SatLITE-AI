@@ -325,42 +325,44 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
 };
 
 const processMarkedImage = async (originalFile: File, answerText: string) => {
-  const boxRegex = /\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]([^\n]*)/g;
-  const boxes: {ymin: number, xmin: number, ymax: number, xmax: number, label: string}[] = [];
-  let match;
+  let boxes: {ymin: number, xmin: number, ymax: number, xmax: number, label: string}[] = [];
+  let cleanText = answerText;
 
-  while ((match = boxRegex.exec(answerText)) !== null) {
-    let rawLabel = match[5] ? match[5].trim() : '';
-    const jsonLabelMatch = rawLabel.match(/"label"\s*:\s*"([^"]+)"/i);
-    if (jsonLabelMatch) {
-      rawLabel = jsonLabelMatch[1];
-    } else {
-      rawLabel = rawLabel.replace(/^[^a-zA-Z0-9]+/, '').replace(/["}\]]+$/, '').trim();
+  try {
+    const rawStr = answerText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const data = JSON.parse(rawStr);
+    
+    if (data.boxes && Array.isArray(data.boxes)) {
+      boxes = data.boxes.map((b: any) => ({
+        ymin: b.box[0], xmin: b.box[1], ymax: b.box[2], xmax: b.box[3],
+        label: b.label || 'Object'
+      }));
     }
-
-    boxes.push({
-      ymin: parseInt(match[1]),
-      xmin: parseInt(match[2]),
-      ymax: parseInt(match[3]),
-      xmax: parseInt(match[4]),
-      label: rawLabel || 'Object'
-    });
+    
+    let formattedText = '';
+    for (const [k, v] of Object.entries(data)) {
+      if (k === 'boxes') continue;
+      if (Array.isArray(v)) {
+        formattedText += `**${k.replace(/_/g, ' ').toUpperCase()}**\n${v.map((item) => `• ${item}`).join('\n')}\n\n`;
+      } else {
+        formattedText += `**${k.replace(/_/g, ' ').toUpperCase()}**: ${v}\n\n`;
+      }
+    }
+    cleanText = formattedText.trim();
+  } catch (e) {
+    const boxRegex = /\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]([^\n]*)/g;
+    let match;
+    while ((match = boxRegex.exec(answerText)) !== null) {
+      boxes.push({
+        ymin: parseInt(match[1]), xmin: parseInt(match[2]), ymax: parseInt(match[3]), xmax: parseInt(match[4]),
+        label: match[5].trim().replace(/^[^a-zA-Z0-9]+/, '').replace(/["}\]]+$/, '').trim() || 'Object'
+      });
+    }
+    if (boxes.length > 0) cleanText = answerText.replace(boxRegex, '').trim();
   }
 
   if (boxes.length === 0) {
-    return { cleanText: answerText, markedUrl: null };
-  }
-
-  let cleanText = answerText
-    .replace(/```json[\s\S]*?```/g, '') 
-    .replace(/\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\][^\n]*/g, '') 
-    .replace(/\[\s*\{\s*\}?\s*\]/g, '') 
-    .replace(/^\[\s*|\s*\]$/g, '') 
-    .replace(/\{\s*\}/g, '') 
-    .trim();
-
-  if (!cleanText || cleanText === '[]' || cleanText === '{}') {
-    cleanText = boxes.map(b => `- ${b.label || 'Object'}`).join('\n');
+    return { cleanText: cleanText || answerText, markedUrl: null };
   }
 
   return new Promise<{cleanText: string, markedUrl: string | null}>((resolve) => {
