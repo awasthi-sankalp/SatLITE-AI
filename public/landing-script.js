@@ -35,58 +35,105 @@ const MockData = {
   }
 
   const scene = new window.THREE.Scene();
-  const camera = new window.THREE.PerspectiveCamera(48, window.innerWidth/window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0.4, 7.2);
+  const camera = new window.THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0.4, 7.4);
   const renderer = new window.THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   const isMobile = window.innerWidth < 760;
+  const isWide = window.innerWidth >= 900;
+  const coreOffsetX = isWide ? 2.0 : 0;
+  const globeR = 1.32;
+  const orbitR = 2.35;
 
-  const core = new window.THREE.Group();
-  const shellDefs = [
-    { r:0.62, color:0x57e8c9, wire:true },
-    { r:0.9,  color:0xf2a65a, wire:true },
-    { r:1.2,  color:0x9c8cf5, wire:true }
-  ];
-  const shells = shellDefs.map(d => {
-    const geo = new window.THREE.IcosahedronGeometry(d.r, 1);
-    const mat = new window.THREE.MeshBasicMaterial({ color:d.color, wireframe:true, transparent:true, opacity:0.55 });
-    const mesh = new window.THREE.Mesh(geo, mat);
-    core.add(mesh);
-    return mesh;
+  const world = new window.THREE.Group();
+  world.position.x = coreOffsetX;
+  scene.add(world);
+
+  const occluder = new window.THREE.Mesh(
+    new window.THREE.SphereGeometry(globeR*0.985, 48, 32),
+    new window.THREE.MeshBasicMaterial({ color:0x0a0e14 })
+  );
+  world.add(occluder);
+
+  const wireGlobe = new window.THREE.Mesh(
+    new window.THREE.IcosahedronGeometry(globeR, 3),
+    new window.THREE.MeshBasicMaterial({ color:0x3a4452, wireframe:true, transparent:true, opacity:0.55 })
+  );
+  world.add(wireGlobe);
+
+  const latBands = new window.THREE.Group();
+  [-0.55,-0.2,0.15,0.5].forEach((y,i)=>{
+    const rr = Math.sqrt(Math.max(0.001, globeR*globeR - y*globeR*y*4))*0.999;
+    const band = new window.THREE.Mesh(
+      new window.THREE.TorusGeometry(rr, 0.003, 8, 64),
+      new window.THREE.MeshBasicMaterial({ color: i%2===0 ? 0x57e8c9 : 0xf2a65a, transparent:true, opacity:0.28 })
+    );
+    band.rotation.x = Math.PI/2;
+    band.position.y = y*globeR*0.72;
+    latBands.add(band);
   });
-  const centerGeo = new window.THREE.SphereGeometry(0.34, 32, 32);
-  const centerMat = new window.THREE.MeshBasicMaterial({ color:0xe7ecf2, transparent:true, opacity:0.9 });
-  const centerSphere = new window.THREE.Mesh(centerGeo, centerMat);
-  core.add(centerSphere);
-  scene.add(core);
+  world.add(latBands);
 
-  const ringGeo = new window.THREE.RingGeometry(2.05, 2.07, 128);
-  const ringMat = new window.THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0.12, side:window.THREE.DoubleSide });
-  const ring = new window.THREE.Mesh(ringGeo, ringMat);
-  ring.rotation.x = Math.PI/2.3;
-  scene.add(ring);
+  const glow = new window.THREE.Mesh(
+    new window.THREE.SphereGeometry(globeR*1.12, 32, 24),
+    new window.THREE.MeshBasicMaterial({ color:0x57e8c9, transparent:true, opacity:0.045, side:window.THREE.BackSide })
+  );
+  world.add(glow);
 
-  const satGeo = new window.THREE.OctahedronGeometry(0.06);
-  const satMat = new window.THREE.MeshBasicMaterial({ color:0x57e8c9 });
-  const sat = new window.THREE.Mesh(satGeo, satMat);
-  scene.add(sat);
+  const orbitGeo = new window.THREE.RingGeometry(orbitR-0.008, orbitR+0.008, 128);
+  const orbit = new window.THREE.Mesh(orbitGeo, new window.THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0.14, side:window.THREE.DoubleSide }));
+  orbit.rotation.x = Math.PI/2.25;
+  world.add(orbit);
+  const orbit2 = orbit.clone();
+  orbit2.material = orbit.material.clone();
+  orbit2.material.opacity = 0.05;
+  orbit2.scale.setScalar(1.35);
+  orbit2.rotation.x = Math.PI/2.7;
+  orbit2.rotation.z = 0.6;
+  world.add(orbit2);
 
-  const pCount = isMobile ? 260 : 700;
+  const satellite = new window.THREE.Group();
+  const bodyMat = new window.THREE.MeshBasicMaterial({ color:0xe7ecf2 });
+  const body = new window.THREE.Mesh(new window.THREE.BoxGeometry(0.16,0.11,0.24), bodyMat);
+  satellite.add(body);
+  const panelMat = new window.THREE.MeshBasicMaterial({ color:0x57e8c9, transparent:true, opacity:0.85 });
+  const panelEdgeMat = new window.THREE.LineBasicMaterial({ color:0x0a0e14, transparent:true, opacity:0.6 });
+  [-1,1].forEach(side=>{
+    const panel = new window.THREE.Mesh(new window.THREE.BoxGeometry(0.5,0.015,0.17), panelMat);
+    panel.position.x = side*0.42;
+    satellite.add(panel);
+    const edges = new window.THREE.LineSegments(new window.THREE.EdgesGeometry(new window.THREE.BoxGeometry(0.5,0.015,0.17)), panelEdgeMat);
+    edges.position.copy(panel.position);
+    satellite.add(edges);
+  });
+  const dish = new window.THREE.Mesh(new window.THREE.CylinderGeometry(0.055,0.07,0.05,16,1,true), new window.THREE.MeshBasicMaterial({ color:0xf2a65a, side:window.THREE.DoubleSide }));
+  dish.position.set(0,-0.09,0.05);
+  dish.rotation.x = Math.PI*0.15;
+  satellite.add(dish);
+  world.add(satellite);
+
+  const beamMat = new window.THREE.MeshBasicMaterial({ color:0x57e8c9, transparent:true, opacity:0, blending:window.THREE.AdditiveBlending, depthWrite:false });
+  const beam = new window.THREE.Mesh(new window.THREE.ConeGeometry(0.16, 1, 20, 1, true), beamMat);
+  world.add(beam);
+  const footMat = new window.THREE.MeshBasicMaterial({ color:0x57e8c9, transparent:true, opacity:0, side:window.THREE.DoubleSide, blending:window.THREE.AdditiveBlending, depthWrite:false });
+  const footprint = new window.THREE.Mesh(new window.THREE.RingGeometry(0.05,0.13,32), footMat);
+  world.add(footprint);
+
+  const pCount = isMobile ? 300 : 800;
   const pGeo = new window.THREE.BufferGeometry();
   const positions = new Float32Array(pCount*3);
   for (let i=0;i<pCount;i++){
-    const r = 3 + Math.random()*5;
+    const r = 3.2 + Math.random()*5.5;
     const theta = Math.random()*Math.PI*2;
     const phi = Math.acos((Math.random()*2)-1);
-    positions[i*3] = r*Math.sin(phi)*Math.cos(theta);
-    positions[i*3+1] = r*Math.sin(phi)*Math.sin(theta)*0.6;
+    positions[i*3] = coreOffsetX*0.55 + r*Math.sin(phi)*Math.cos(theta);
+    positions[i*3+1] = r*Math.sin(phi)*Math.sin(theta)*0.65;
     positions[i*3+2] = r*Math.cos(phi);
   }
   pGeo.setAttribute('position', new window.THREE.BufferAttribute(positions,3));
-  const pMat = new window.THREE.PointsMaterial({ color:0x8a93a3, size:0.02, transparent:true, opacity:0.5 });
-  const particles = new window.THREE.Points(pGeo, pMat);
+  const particles = new window.THREE.Points(pGeo, new window.THREE.PointsMaterial({ color:0x8a93a3, size:0.018, transparent:true, opacity:0.55 }));
   scene.add(particles);
 
   let mouseX = 0, mouseY = 0, targetRotX = 0, targetRotY = 0;
@@ -100,19 +147,15 @@ const MockData = {
     mouseY = (e.touches[0].clientY/window.innerHeight - 0.5);
   }, { passive:true });
 
-  let exploded = false;
+  let forcedPulse = 0;
   canvas.addEventListener('click', ()=>{
-    exploded = !exploded;
-    const dist = exploded ? 1 : 0;
-    shells.forEach((s,i)=>{
-      window.gsap.to(s.position, { z: dist*(i+1)*0.5, duration:0.9, ease:'power3.out' });
-      window.gsap.to(s.scale, { x:1+dist*0.35*(i+1), y:1+dist*0.35*(i+1), z:1+dist*0.35*(i+1), duration:0.9, ease:'power3.out' });
-    });
-    window.gsap.to(camera.position, { z: exploded ? 5.6 : 7.2, duration:1, ease:'power3.inOut' });
+    forcedPulse = 1;
+    if (window.gsap) window.gsap.to(camera.position, { z: 6.2, duration:0.9, ease:'power3.out', yoyo:true, repeat:1, repeatDelay:0.6 });
   });
   canvas.style.cursor = 'pointer';
 
-  let angle = 0;
+  const inclination = 1.1;
+  let angle = Math.PI*0.15;
   const clock = new window.THREE.Clock();
   let visible = true;
   document.addEventListener('visibilitychange', ()=>{ visible = !document.hidden; });
@@ -121,20 +164,46 @@ const MockData = {
     requestAnimationFrame(animate);
     if (!visible) return;
     const dt = clock.getDelta();
-    const speed = REDUCED_MOTION ? 0.15 : 1;
-    angle += dt*0.35*speed;
-    core.rotation.y += dt*0.12*speed;
-    core.rotation.x = Math.sin(angle*0.3)*0.08;
-    shells.forEach((s,i)=>{ s.rotation.x += dt*(0.05+i*0.03)*speed; s.rotation.y -= dt*(0.04+i*0.02)*speed; });
+    const speed = REDUCED_MOTION ? 0.12 : 1;
+    angle += dt*0.3*speed;
 
-    sat.position.set(Math.cos(angle)*2.06, Math.sin(angle*0.4)*0.4, Math.sin(angle)*2.06*Math.cos(1.15));
-    particles.rotation.y += dt*0.01*speed;
+    wireGlobe.rotation.y += dt*0.06*speed;
+    latBands.rotation.y += dt*0.06*speed;
 
-    targetRotX += (mouseY*0.4 - targetRotX)*0.04;
-    targetRotY += (mouseX*0.5 - targetRotY)*0.04;
-    camera.position.x = targetRotY*1.4;
-    camera.position.y = 0.4 - targetRotX*1.1;
-    camera.lookAt(0,0,0);
+    const sx = Math.cos(angle)*orbitR;
+    const sy = Math.sin(angle)*orbitR*Math.sin(inclination);
+    const sz = Math.sin(angle)*orbitR*Math.cos(inclination);
+    satellite.position.set(sx, sy, sz);
+    satellite.lookAt(0,0,0);
+    satellite.rotateY(Math.PI/2);
+
+    const dir = new window.THREE.Vector3(sx,sy,sz).normalize();
+    const subPoint = dir.clone().multiplyScalar(globeR*1.001);
+
+    const passPhase = (Math.sin(angle*1.15)+1)/2;
+    let vis = passPhase > 0.72 ? (passPhase-0.72)/0.28 : 0;
+    if (forcedPulse > 0){ vis = Math.max(vis, forcedPulse); forcedPulse -= dt*1.4; if(forcedPulse<0) forcedPulse=0; }
+
+    beam.position.copy(satellite.position).lerp(subPoint, 0.5);
+    beam.lookAt(subPoint);
+    beam.rotateX(Math.PI/2);
+    const beamLen = satellite.position.distanceTo(subPoint);
+    beam.scale.set(vis*0.6+0.001, beamLen, vis*0.6+0.001);
+    beamMat.opacity = vis*0.22;
+
+    footprint.position.copy(subPoint);
+    footprint.lookAt(dir.clone().multiplyScalar(globeR*2));
+    footprint.scale.setScalar(0.6+vis*0.8);
+    footMat.opacity = vis*0.75;
+
+    particles.rotation.y += dt*0.008*speed;
+
+    targetRotX += (mouseY*0.35 - targetRotX)*0.04;
+    targetRotY += (mouseX*0.45 - targetRotY)*0.04;
+    const drift = REDUCED_MOTION ? 0 : Math.sin(angle*0.12)*0.15;
+    camera.position.x = coreOffsetX*0.9 + targetRotY*1.1 + drift;
+    camera.position.y = 0.3 - targetRotX*0.9;
+    camera.lookAt(coreOffsetX, 0, 0);
 
     renderer.render(scene, camera);
   }
@@ -152,8 +221,9 @@ if (window.gsap) {
     .to('#h-eyebrow', { opacity:1, y:0, duration:0.6 })
     .fromTo('#h-title', {opacity:0,y:20}, { opacity:1, y:0, duration:0.8 }, '-=0.3')
     .fromTo('#h-sub', {opacity:0,y:16}, { opacity:1, y:0, duration:0.7 }, '-=0.4')
-    .fromTo('#h-cta', {opacity:0,y:14}, { opacity:1, y:0, duration:0.6 }, '-=0.4')
-    .to('#h-scroll', { opacity:1, duration:0.6 }, '-=0.3');
+    .fromTo('#h-cta', {opacity:0,y:12}, { opacity:1, y:0, duration:0.6 }, '-=0.4')
+    .to(['#hudTop','#hudBottom'], { opacity:1, duration:0.8 }, '-=0.5')
+    .to('#h-scroll', { opacity:1, duration:0.6 }, '-=0.4');
 }
 
 document.querySelectorAll('.reveal').forEach((el, i)=>{

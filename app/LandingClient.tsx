@@ -26,14 +26,25 @@ export default function LandingClient() {
       <section className="hero" id="hero" style={{ maxWidth: 'none', padding: 0 }}>
         <canvas id="hero-canvas" aria-hidden="true" />
         <div className="hero-fallback" id="heroFallback"></div>
-        <div className="hero-content">
-          <div className="hero-eyebrow mono" id="h-eyebrow">Hackathon Project 167 · <b>ISRO / SAC</b> Remote Sensing Challenge</div>
-          <h1 id="h-title">One query. Every sensor.<br/><span className="o">Optical</span> + <span className="s">SAR</span>. One answer.</h1>
-          <p id="h-sub">SatQuery AI is an agentic vision-language assistant that reads a satellite image — or two — and answers plain-language questions about what changed, what's there, and where. No GIS pipeline required.</p>
-          <div className="cta-row" id="h-cta">
-            <a href="#system" className="btn-primary" style={{ textDecoration: 'none' }}>Explore the System</a>
-            <a href="#demo" className="btn-ghost" style={{ textDecoration: 'none' }}>Jump to Live Demo</a>
+        <div className="hero-scrim"></div>
+        <div className="hero-grid">
+          <div className="hero-content">
+            <div className="hero-eyebrow mono" id="h-eyebrow">Hackathon Project 167 · <b>ISRO / SAC</b> Remote Sensing Challenge</div>
+            <h1 id="h-title">Don't select a model.<br/>Just <span className="o">ask the</span> <span className="s">imagery</span>.</h1>
+            <p className="hero-sub" id="h-sub">SatQuery AI is an agentic vision-language assistant for optical and SAR satellite imagery — it routes plain-language questions to the right specialist model and answers with visual evidence.</p>
+            <div className="hero-cta" id="h-cta">
+              <a href="#system" className="btn-primary" style={{ textDecoration: 'none' }}>Explore the System</a>
+              <a href="#demo" className="btn-ghost" style={{ textDecoration: 'none' }}>See the full demo →</a>
+            </div>
           </div>
+          <div aria-hidden="true"></div>
+        </div>
+        <div className="hero-hud tl mono" id="hudTop">
+          <div className="row"><span id="hudAlt">ALT 705.2 KM</span><i></i></div>
+          <div className="row"><span id="hudInc">INC 98.1°</span><i></i></div>
+        </div>
+        <div className="hero-hud bl mono" id="hudBottom">
+          <div className="row"><span id="hudPass">PASS 06 / 14 — NOMINAL</span><i></i></div>
         </div>
         <div className="scroll-cue" id="h-scroll"><div className="line"></div><span>Scroll</span></div>
       </section>
