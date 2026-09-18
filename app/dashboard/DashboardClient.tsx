@@ -68,10 +68,35 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
 };
 
 
+const FACTORS = [
+  {
+    id: 'builtup',
+    label: 'Built-up Area',
+    description: 'High-backscatter zones in SAR indicating dense urban or industrial structures.',
+    dots: [
+      { x: 28, y: 35 },
+      { x: 52, y: 22 },
+      { x: 71, y: 58 },
+    ],
+  },
+  {
+    id: 'change',
+    label: 'Change vs. Prior Acquisition',
+    description: 'Regions showing spectral or radar divergence indicating land-cover modification.',
+    dots: [
+      { x: 38, y: 65 },
+      { x: 60, y: 42 },
+      { x: 18, y: 75 },
+    ],
+  },
+];
+
 function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarUrl: string }) {
   const [showOptical, setShowOptical] = useState(true);
   const [showSar, setShowSar] = useState(true);
   const [blendMode, setBlendMode] = useState<'screen' | 'multiply' | 'overlay'>('screen');
+  const [activeDots, setActiveDots] = useState<Set<string>>(new Set());
+  const [activeFactorId, setActiveFactorId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -79,18 +104,15 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     const optImg = new Image();
     const sarImg = new Image();
     let optLoaded = false;
     let sarLoaded = false;
-
     const draw = () => {
       if (!optLoaded || !sarLoaded) return;
       canvas.width = optImg.naturalWidth || optImg.width;
       canvas.height = optImg.naturalHeight || optImg.height;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       if (showOptical && !showSar) {
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1.0;
@@ -110,64 +132,110 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
         ctx.globalAlpha = 1.0;
       }
     };
-
     optImg.onload = () => { optLoaded = true; draw(); };
     sarImg.onload = () => { sarLoaded = true; draw(); };
     optImg.src = opticalUrl;
     sarImg.src = sarUrl;
   }, [opticalUrl, sarUrl, showOptical, showSar, blendMode]);
 
+  const toggleDot = (dotKey: string, factorId: string) => {
+    setActiveDots(prev => {
+      const next = new Set(prev);
+      if (next.has(dotKey)) { next.delete(dotKey); } else { next.add(dotKey); }
+      return next;
+    });
+    setActiveFactorId(factorId);
+  };
+
   return (
-    <div className="mb-6 border border-[rgba(87,232,201,0.3)] bg-[#0d131b] p-4 rounded-sm">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-[#57e8c9] mb-3 pb-2 border-b border-[rgba(87,232,201,0.2)]">
-        Fused Layer Inspector — Optical + SAR
-      </h3>
-      <div className="flex flex-wrap gap-4 mb-4 items-center">
-        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showOptical}
-            onChange={e => setShowOptical(e.target.checked)}
-            className="accent-[#57e8c9] w-4 h-4"
-          />
-          <span className="w-2 h-2 rounded-full bg-[#57e8c9] inline-block"></span>
-          Optical
+    <div className="mb-6 border border-[rgba(87,232,201,0.25)] bg-[#0a0e14] rounded-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-[rgba(87,232,201,0.15)] flex flex-wrap items-center gap-4">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#57e8c9]">Fused Layer Inspector</span>
+        <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+          <input type="checkbox" checked={showOptical} onChange={e => setShowOptical(e.target.checked)} className="accent-[#57e8c9] w-3.5 h-3.5" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#57e8c9] inline-block"></span>Optical
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showSar}
-            onChange={e => setShowSar(e.target.checked)}
-            className="accent-[#f2a65a] w-4 h-4"
-          />
-          <span className="w-2 h-2 rounded-full bg-[#f2a65a] inline-block"></span>
-          SAR
+        <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+          <input type="checkbox" checked={showSar} onChange={e => setShowSar(e.target.checked)} className="accent-[#f2a65a] w-3.5 h-3.5" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#f2a65a] inline-block"></span>SAR
         </label>
         {showOptical && showSar && (
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-gray-500 uppercase tracking-wider">Blend:</span>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-[10px] text-gray-600 uppercase tracking-wider">Blend:</span>
             {(['screen', 'multiply', 'overlay'] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => setBlendMode(m)}
-                className={`text-xs px-2 py-1 border transition-colors ${blendMode === m ? 'border-[#57e8c9] text-[#57e8c9]' : 'border-gray-600 text-gray-400 hover:border-gray-400'}`}
-              >
+              <button key={m} onClick={() => setBlendMode(m)}
+                className={`text-[10px] px-2 py-0.5 border transition-colors ${blendMode === m ? 'border-[#57e8c9] text-[#57e8c9]' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`}>
                 {m}
               </button>
             ))}
           </div>
         )}
       </div>
-      <div className="relative border border-gray-800 bg-black overflow-hidden flex items-center justify-center min-h-[280px]">
-        {(!showOptical && !showSar) ? (
-          <div className="text-gray-600 text-sm">No layers selected</div>
-        ) : (
-          <canvas ref={canvasRef} className="max-w-full max-h-[520px] object-contain" />
-        )}
+
+      <div className="flex flex-col md:flex-row">
+        <div className="relative flex-1 bg-black min-h-[260px] flex items-center justify-center overflow-hidden">
+          {(!showOptical && !showSar) ? (
+            <div className="text-gray-700 text-sm">No layers selected</div>
+          ) : (
+            <div className="relative w-full h-full flex items-center justify-center">
+              <canvas ref={canvasRef} className="max-w-full max-h-[480px] object-contain" />
+              {FACTORS.map(factor =>
+                factor.dots.map((dot, di) => {
+                  const dotKey = `${factor.id}-${di}`;
+                  const filled = activeDots.has(dotKey);
+                  return (
+                    <button
+                      key={dotKey}
+                      title={factor.label}
+                      onClick={() => toggleDot(dotKey, factor.id)}
+                      className="absolute w-4 h-4 rounded-full border-2 border-[#4ade80] transition-all duration-200 z-10 hover:scale-125 focus:outline-none"
+                      style={{
+                        left: `${dot.x}%`,
+                        top: `${dot.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                        background: filled ? '#4ade80' : 'transparent',
+                        boxShadow: filled ? '0 0 10px #4ade8088' : '0 0 6px #4ade8055',
+                      }}
+                    />
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="md:w-56 border-t md:border-t-0 md:border-l border-[rgba(255,255,255,0.06)] bg-[#0d131b] p-4 flex flex-col gap-5">
+          {FACTORS.map(factor => {
+            const anyActive = factor.dots.some((_, di) => activeDots.has(`${factor.id}-${di}`));
+            return (
+              <div key={factor.id} className={`transition-opacity ${anyActive ? 'opacity-100' : 'opacity-40'}`}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={`w-2 h-2 rounded-full border-2 border-[#4ade80] flex-shrink-0 ${anyActive ? 'bg-[#4ade80]' : 'bg-transparent'}`}></span>
+                  <p className="text-[11px] font-semibold tracking-wide text-white" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                    {factor.label}
+                  </p>
+                </div>
+                <p className="text-[11px] text-gray-500 leading-relaxed pl-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                  {factor.description}
+                </p>
+                <div className="mt-2 pl-4 flex gap-1">
+                  {factor.dots.map((_, di) => {
+                    const dotKey = `${factor.id}-${di}`;
+                    return (
+                      <span key={dotKey}
+                        className={`w-2 h-2 rounded-full border border-[#4ade80] inline-block transition-all ${activeDots.has(dotKey) ? 'bg-[#4ade80]' : 'bg-transparent'}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          <p className="text-[10px] text-gray-700 mt-auto leading-relaxed" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+            Click the green dots on the image to activate factor markers.
+          </p>
+        </div>
       </div>
-      <p className="text-xs text-gray-600 mt-2">
-        Toggle layers to compare optical vs SAR signal. Use blend modes to reveal fused features.
-      </p>
     </div>
   );
 }
