@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const MODEL = 'gemini-3.7-flash';
+const MODEL = 'gemini-3.6-flash';
 
 function getGeminiKeys(): string[] {
   const keys: string[] = [];

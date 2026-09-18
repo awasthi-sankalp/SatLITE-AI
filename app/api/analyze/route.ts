@@ -20,12 +20,23 @@ async function callGeminiWithRotation(imageParts: Part[], promptText: string): P
     throw new Error('No Gemini API keys configured. Add GEMINI_KEY_1 … GEMINI_KEY_21 to your Vercel environment variables.');
   }
 
+  const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`Request timed out after ${ms / 1000}s`)), ms)
+      ),
+    ]);
+
   const errors: string[] = [];
   for (let i = 0; i < keys.length; i++) {
     try {
       const genAI = new GoogleGenerativeAI(keys[i]);
       const model = genAI.getGenerativeModel({ model: MODEL });
-      const result = await model.generateContent([...imageParts, { text: promptText }]);
+      const result = await withTimeout(
+        model.generateContent([...imageParts, { text: promptText }]),
+        45000
+      );
       const answer = result.response.text().trim();
       
       let tokensUsed = result.response.usageMetadata?.totalTokenCount || 0;
