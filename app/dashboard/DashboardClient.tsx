@@ -72,6 +72,8 @@ const FACTORS = [
   {
     id: 'builtup',
     label: 'Built-up Area',
+    requires: 'sar',
+    color: '#4ade80',
     description: 'High-backscatter zones in SAR indicating dense urban or industrial structures.',
     dots: [
       { x: 28, y: 35 },
@@ -82,6 +84,8 @@ const FACTORS = [
   {
     id: 'change',
     label: 'Change vs. Prior Acquisition',
+    requires: 'both',
+    color: '#ef4444',
     description: 'Regions showing spectral or radar divergence indicating land-cover modification.',
     dots: [
       { x: 38, y: 65 },
@@ -147,6 +151,13 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
     setActiveFactorId(factorId);
   };
 
+  const isFactorActive = (requires: string) => {
+    if (requires === 'sar') return showSar;
+    if (requires === 'optical') return showOptical;
+    if (requires === 'both') return showOptical && showSar;
+    return true;
+  };
+
   return (
     <div className="mb-6 border border-[rgba(87,232,201,0.25)] bg-[#0a0e14] rounded-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-[rgba(87,232,201,0.15)] flex flex-wrap items-center gap-4">
@@ -179,8 +190,9 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
           ) : (
             <div className="relative w-full h-full flex items-center justify-center">
               <canvas ref={canvasRef} className="max-w-full max-h-[480px] object-contain" />
-              {FACTORS.map(factor =>
-                factor.dots.map((dot, di) => {
+              {FACTORS.map(factor => {
+                if (!isFactorActive(factor.requires)) return null;
+                return factor.dots.map((dot, di) => {
                   const dotKey = `${factor.id}-${di}`;
                   const filled = activeDots.has(dotKey);
                   return (
@@ -188,31 +200,33 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
                       key={dotKey}
                       title={factor.label}
                       onClick={() => toggleDot(dotKey, factor.id)}
-                      className="absolute w-4 h-4 rounded-full border-2 border-[#4ade80] transition-all duration-200 z-10 hover:scale-125 focus:outline-none"
+                      className="absolute w-4 h-4 rounded-full border-2 transition-all duration-200 z-10 hover:scale-125 focus:outline-none"
                       style={{
                         left: `${dot.x}%`,
                         top: `${dot.y}%`,
                         transform: 'translate(-50%, -50%)',
-                        background: filled ? '#4ade80' : 'transparent',
-                        boxShadow: filled ? '0 0 10px #4ade8088' : '0 0 6px #4ade8055',
+                        borderColor: factor.color,
+                        background: filled ? factor.color : 'transparent',
+                        boxShadow: filled ? `0 0 10px ${factor.color}88` : `0 0 6px ${factor.color}55`,
                       }}
                     />
                   );
-                })
-              )}
+                });
+              })}
             </div>
           )}
         </div>
 
         <div className="md:w-56 border-t md:border-t-0 md:border-l border-[rgba(255,255,255,0.06)] bg-[#0d131b] p-4 flex flex-col gap-5">
           {FACTORS.map(factor => {
+            const meetsReqs = isFactorActive(factor.requires);
             const anyActive = factor.dots.some((_, di) => activeDots.has(`${factor.id}-${di}`));
             return (
-              <div key={factor.id} className={`transition-opacity ${anyActive ? 'opacity-100' : 'opacity-40'}`}>
+              <div key={factor.id} className={`transition-all duration-300 ${!meetsReqs ? 'opacity-20 grayscale' : (anyActive ? 'opacity-100' : 'opacity-40')}`}>
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className={`w-2 h-2 rounded-full border-2 border-[#4ade80] flex-shrink-0 ${anyActive ? 'bg-[#4ade80]' : 'bg-transparent'}`}></span>
+                  <span className={`w-2 h-2 rounded-full border-2 flex-shrink-0 transition-colors`} style={{ borderColor: factor.color, backgroundColor: (anyActive && meetsReqs) ? factor.color : 'transparent' }}></span>
                   <p className="text-[11px] font-semibold tracking-wide text-white" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-                    {factor.label}
+                    {factor.label} {!meetsReqs && `(Requires ${factor.requires.toUpperCase()})`}
                   </p>
                 </div>
                 <p className="text-[11px] text-gray-500 leading-relaxed pl-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -223,7 +237,8 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
                     const dotKey = `${factor.id}-${di}`;
                     return (
                       <span key={dotKey}
-                        className={`w-2 h-2 rounded-full border border-[#4ade80] inline-block transition-all ${activeDots.has(dotKey) ? 'bg-[#4ade80]' : 'bg-transparent'}`}
+                        className={`w-2 h-2 rounded-full border inline-block transition-all`}
+                        style={{ borderColor: factor.color, backgroundColor: (activeDots.has(dotKey) && meetsReqs) ? factor.color : 'transparent' }}
                       />
                     );
                   })}
