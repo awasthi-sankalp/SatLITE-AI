@@ -137,22 +137,74 @@ const MockData = {
   scene.add(particles);
 
   let mouseX = 0, mouseY = 0, targetRotX = 0, targetRotY = 0;
+  
+  let isDragging = false;
+  let previousMousePosition = { x: 0, y: 0 };
+  let dragVelocity = { x: 0, y: 0 };
+  let worldRotX = 0;
+  let worldRotY = 0;
+  let dragDist = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    previousMousePosition = { x: e.clientX, y: e.clientY };
+    dragVelocity = { x: 0, y: 0 };
+    dragDist = 0;
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  canvas.addEventListener('touchstart', (e) => {
+    if(!e.touches[0]) return;
+    isDragging = true;
+    previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    dragVelocity = { x: 0, y: 0 };
+    dragDist = 0;
+  }, { passive: true });
+
+  window.addEventListener('touchend', () => {
+    isDragging = false;
+  });
+
   window.addEventListener('mousemove', (e)=>{
     mouseX = (e.clientX/window.innerWidth - 0.5);
     mouseY = (e.clientY/window.innerHeight - 0.5);
+    if (isDragging) {
+      const deltaX = e.clientX - previousMousePosition.x;
+      const deltaY = e.clientY - previousMousePosition.y;
+      dragVelocity.x = deltaX * 0.003;
+      dragVelocity.y = deltaY * 0.003;
+      dragDist += Math.abs(deltaX) + Math.abs(deltaY);
+      previousMousePosition = { x: e.clientX, y: e.clientY };
+    }
   }, { passive:true });
+  
   window.addEventListener('touchmove', (e)=>{
     if(!e.touches[0]) return;
     mouseX = (e.touches[0].clientX/window.innerWidth - 0.5);
     mouseY = (e.touches[0].clientY/window.innerHeight - 0.5);
+    if (isDragging) {
+      const deltaX = e.touches[0].clientX - previousMousePosition.x;
+      const deltaY = e.touches[0].clientY - previousMousePosition.y;
+      dragVelocity.x = deltaX * 0.003;
+      dragVelocity.y = deltaY * 0.003;
+      dragDist += Math.abs(deltaX) + Math.abs(deltaY);
+      previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
   }, { passive:true });
 
   let forcedPulse = 0;
   canvas.addEventListener('click', ()=>{
-    forcedPulse = 1;
-    if (window.gsap) window.gsap.to(camera.position, { z: 6.2, duration:0.9, ease:'power3.out', yoyo:true, repeat:1, repeatDelay:0.6 });
+    if (dragDist < 10) {
+      forcedPulse = 1;
+      if (window.gsap) window.gsap.to(camera.position, { z: 6.2, duration:0.9, ease:'power3.out', yoyo:true, repeat:1, repeatDelay:0.6 });
+    }
   });
-  canvas.style.cursor = 'pointer';
+  canvas.style.cursor = 'grab';
+  canvas.addEventListener('mousedown', () => canvas.style.cursor = 'grabbing');
+  canvas.addEventListener('mouseup', () => canvas.style.cursor = 'grab');
 
   const inclination = 1.1;
   let angle = Math.PI*0.15;
@@ -166,6 +218,17 @@ const MockData = {
     const dt = clock.getDelta();
     const speed = REDUCED_MOTION ? 0.12 : 1;
     angle += dt*0.3*speed;
+
+    if (!isDragging) {
+      dragVelocity.x *= 0.95;
+      dragVelocity.y *= 0.95;
+    }
+    worldRotY += dragVelocity.x;
+    worldRotX += dragVelocity.y;
+    worldRotX = Math.max(-Math.PI/3, Math.min(Math.PI/3, worldRotX));
+    
+    world.rotation.y = worldRotY;
+    world.rotation.x = worldRotX;
 
     wireGlobe.rotation.y += dt*0.06*speed;
     latBands.rotation.y += dt*0.06*speed;

@@ -175,7 +175,7 @@
 }
 .chaos-item{
   position:absolute;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 14px;
-  border:1px solid var(--border-strong);border-radius:999px;background:var(--surface);color:var(--text-dim);
+  border:1px solid var(--border-strong);border-radius:999px;background:#ffffff;color:#000000;
   white-space:nowrap;
 }
 .problem-line{
