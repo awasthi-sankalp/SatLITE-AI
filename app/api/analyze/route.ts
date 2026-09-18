@@ -199,7 +199,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const isQuota = /quota|rate.limit|429|resource.exhausted/i.test(message);
+    return NextResponse.json(
+      {
+        error: isQuota
+          ? 'All API keys are quota-exhausted. Google resets free-tier quotas at midnight Pacific (12:30 AM IST). Please try again later.'
+          : message,
+      },
+      { status: isQuota ? 429 : 500 }
+    );
   }
 }
 

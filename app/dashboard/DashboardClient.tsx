@@ -317,6 +317,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
             : `Server error (${res.status}): the API returned an unexpected response. Please try again shortly.`
         );
       }
+      if (res.status === 429) throw new Error(data.error || 'All API keys are quota-exhausted. Please try again after 12:30 AM IST.');
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       
       if (slots[0]?.file && data.answer) {
@@ -382,7 +383,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
                   className="w-full object-cover"
                   style={{ maxHeight: '280px' }}
                 />
-                <div className="absolute inset-0 bg-white bg-opacity-0 group-hover:bg-opacity-10 transition-all" />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all" />
                 <button
                   onClick={() => removeSlot(i)}
                   className="absolute top-2 right-2 bg-white text-black text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -465,13 +466,13 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
       </div>
 
       {error && (
-        <div className="border border-red-400 bg-red-50 text-red-700 p-4 text-sm mb-6">
+        <div className="border border-red-500 bg-red-950 text-red-400 p-4 text-sm mb-6">
           <strong>Error:</strong> {error}
         </div>
       )}
 
       {result && (
-        <div className="border border-gray-200 p-6 mb-4">
+        <div className="border border-gray-700 p-6 mb-4">
           <h2 className="font-bold text-lg mb-1">Analysis Result</h2>
           <p className="text-xs text-gray-500 mb-4">
             Task: <span className="font-medium text-white">{result.execution_summary.task}</span>
