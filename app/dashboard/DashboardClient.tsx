@@ -67,6 +67,75 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
   ],
 };
 
+
+function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string, sarUrl: string }) {
+  const [showOptical, setShowOptical] = useState(true);
+  const [showSar, setShowSar] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const optImg = new Image();
+    const sarImg = new Image();
+    let optLoaded = false;
+    let sarLoaded = false;
+
+    const draw = () => {
+      if (!optLoaded || !sarLoaded) return;
+      canvas.width = optImg.width;
+      canvas.height = optImg.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (showOptical && !showSar) {
+        ctx.drawImage(optImg, 0, 0);
+      } else if (!showOptical && showSar) {
+        ctx.drawImage(sarImg, 0, 0, optImg.width, optImg.height);
+      } else if (showOptical && showSar) {
+        ctx.drawImage(optImg, 0, 0);
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(sarImg, 0, 0, optImg.width, optImg.height);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+      }
+    };
+
+    optImg.onload = () => { optLoaded = true; draw(); };
+    sarImg.onload = () => { sarLoaded = true; draw(); };
+    optImg.src = opticalUrl;
+    sarImg.src = sarUrl;
+  }, [opticalUrl, sarUrl, showOptical, showSar]);
+
+  return (
+    <div className="mb-6 bg-[#0d131b] border border-gray-700 p-4 rounded-md">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-white opacity-80 mb-3 border-b border-gray-700 pb-2">
+        Fused Layer Inspector (Optical + SAR)
+      </h3>
+      <div className="flex gap-4 mb-4">
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" checked={showOptical} onChange={e => setShowOptical(e.target.checked)} className="accent-[#57e8c9]" />
+          Optical Layer
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" checked={showSar} onChange={e => setShowSar(e.target.checked)} className="accent-[#f2a65a]" />
+          SAR Layer
+        </label>
+      </div>
+      <div className="relative border border-gray-700 bg-black overflow-hidden flex items-center justify-center min-h-[300px]">
+        {(!showOptical && !showSar) ? (
+          <div className="text-gray-600 text-sm">No layers selected</div>
+        ) : (
+          <canvas ref={canvasRef} className="max-w-full max-h-[500px] object-contain" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardClient() {
   const [mode, setMode] = useState<Mode>('single');
   const [slots, setSlots] = useState<(ImageSlot | null)[]>([null]);
@@ -484,7 +553,12 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
             {cleanAnswer || result.answer}
           </div>
           
-          {markedImage && (
+          
+            {mode === 'crossmodal' && slots[0]?.preview && slots[1]?.preview && (
+              <FusedLayersInspector opticalUrl={slots[0].preview} sarUrl={slots[1].preview} />
+            )}
+
+            {markedImage && (
             <div className="mb-6">
               <h3 className="text-xs font-bold uppercase tracking-wider text-white opacity-80 mb-2 border-b pb-1">
                 Visual Marking
