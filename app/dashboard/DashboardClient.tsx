@@ -67,6 +67,111 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
   ],
 };
 
+
+function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarUrl: string }) {
+  const [showOptical, setShowOptical] = useState(true);
+  const [showSar, setShowSar] = useState(true);
+  const [blendMode, setBlendMode] = useState<'screen' | 'multiply' | 'overlay'>('screen');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const optImg = new Image();
+    const sarImg = new Image();
+    let optLoaded = false;
+    let sarLoaded = false;
+
+    const draw = () => {
+      if (!optLoaded || !sarLoaded) return;
+      canvas.width = optImg.naturalWidth || optImg.width;
+      canvas.height = optImg.naturalHeight || optImg.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (showOptical && !showSar) {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(optImg, 0, 0);
+      } else if (!showOptical && showSar) {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(sarImg, 0, 0, canvas.width, canvas.height);
+      } else if (showOptical && showSar) {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(optImg, 0, 0);
+        ctx.globalCompositeOperation = blendMode;
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(sarImg, 0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+      }
+    };
+
+    optImg.onload = () => { optLoaded = true; draw(); };
+    sarImg.onload = () => { sarLoaded = true; draw(); };
+    optImg.src = opticalUrl;
+    sarImg.src = sarUrl;
+  }, [opticalUrl, sarUrl, showOptical, showSar, blendMode]);
+
+  return (
+    <div className="mb-6 border border-[rgba(87,232,201,0.3)] bg-[#0d131b] p-4 rounded-sm">
+      <h3 className="text-xs font-bold uppercase tracking-widest text-[#57e8c9] mb-3 pb-2 border-b border-[rgba(87,232,201,0.2)]">
+        Fused Layer Inspector — Optical + SAR
+      </h3>
+      <div className="flex flex-wrap gap-4 mb-4 items-center">
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showOptical}
+            onChange={e => setShowOptical(e.target.checked)}
+            className="accent-[#57e8c9] w-4 h-4"
+          />
+          <span className="w-2 h-2 rounded-full bg-[#57e8c9] inline-block"></span>
+          Optical
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showSar}
+            onChange={e => setShowSar(e.target.checked)}
+            className="accent-[#f2a65a] w-4 h-4"
+          />
+          <span className="w-2 h-2 rounded-full bg-[#f2a65a] inline-block"></span>
+          SAR
+        </label>
+        {showOptical && showSar && (
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs text-gray-500 uppercase tracking-wider">Blend:</span>
+            {(['screen', 'multiply', 'overlay'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setBlendMode(m)}
+                className={`text-xs px-2 py-1 border transition-colors ${blendMode === m ? 'border-[#57e8c9] text-[#57e8c9]' : 'border-gray-600 text-gray-400 hover:border-gray-400'}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="relative border border-gray-800 bg-black overflow-hidden flex items-center justify-center min-h-[280px]">
+        {(!showOptical && !showSar) ? (
+          <div className="text-gray-600 text-sm">No layers selected</div>
+        ) : (
+          <canvas ref={canvasRef} className="max-w-full max-h-[520px] object-contain" />
+        )}
+      </div>
+      <p className="text-xs text-gray-600 mt-2">
+        Toggle layers to compare optical vs SAR signal. Use blend modes to reveal fused features.
+      </p>
+    </div>
+  );
+}
+
 export default function DashboardClient() {
   const [mode, setMode] = useState<Mode>('single');
   const [slots, setSlots] = useState<(ImageSlot | null)[]>([null]);
@@ -483,6 +588,10 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
           <div className="text-sm leading-relaxed whitespace-pre-wrap text-white mb-6">
             {cleanAnswer || result.answer}
           </div>
+
+          {mode === 'crossmodal' && slots[0]?.preview && slots[1]?.preview && (
+            <FusedLayersInspector opticalUrl={slots[0].preview} sarUrl={slots[1].preview} />
+          )}
           
           {markedImage && (
             <div className="mb-6">
