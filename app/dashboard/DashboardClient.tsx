@@ -95,13 +95,20 @@ const FACTORS = [
   },
 ];
 
-function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarUrl: string }) {
+function FusedLayersInspector({ opticalUrl, sarUrl, analysisPoints }: { opticalUrl: string; sarUrl: string, analysisPoints: {builtup: {x:number, y:number}[], change: {x:number, y:number}[]} | null }) {
   const [showOptical, setShowOptical] = useState(true);
   const [showSar, setShowSar] = useState(true);
   const [blendMode, setBlendMode] = useState<'screen' | 'multiply' | 'overlay'>('screen');
   const [activeDots, setActiveDots] = useState<Set<string>>(new Set());
   const [activeFactorId, setActiveFactorId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const mergedFactors = FACTORS.map(f => {
+    if (!analysisPoints) return f;
+    if (f.id === 'builtup' && analysisPoints.builtup.length > 0) return { ...f, dots: analysisPoints.builtup };
+    if (f.id === 'change' && analysisPoints.change.length > 0) return { ...f, dots: analysisPoints.change };
+    return f;
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -188,9 +195,9 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
           {(!showOptical && !showSar) ? (
             <div className="text-gray-700 text-sm">No layers selected</div>
           ) : (
-            <div className="relative w-full h-full flex items-center justify-center">
-              <canvas ref={canvasRef} className="max-w-full max-h-[480px] object-contain" />
-              {FACTORS.map(factor => {
+            <div className="relative inline-block max-w-full max-h-[480px]">
+              <canvas ref={canvasRef} className="max-w-full max-h-[480px] block object-contain" />
+              {mergedFactors.map(factor => {
                 if (!isFactorActive(factor.requires)) return null;
                 return factor.dots.map((dot, di) => {
                   const dotKey = `${factor.id}-${di}`;
@@ -218,7 +225,7 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
         </div>
 
         <div className="md:w-56 border-t md:border-t-0 md:border-l border-[rgba(255,255,255,0.06)] bg-[#0d131b] p-4 flex flex-col gap-5">
-          {FACTORS.map(factor => {
+          {mergedFactors.map(factor => {
             const meetsReqs = isFactorActive(factor.requires);
             const anyActive = factor.dots.some((_, di) => activeDots.has(`${factor.id}-${di}`));
             return (
@@ -247,7 +254,7 @@ function FusedLayersInspector({ opticalUrl, sarUrl }: { opticalUrl: string; sarU
             );
           })}
           <p className="text-[10px] text-gray-700 mt-auto leading-relaxed" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-            Click the green dots on the image to activate factor markers.
+            Click the dots on the image to activate factor markers.
           </p>
         </div>
       </div>
@@ -264,9 +271,9 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  
   const [markedImage, setMarkedImage] = useState<string | null>(null);
   const [cleanAnswer, setCleanAnswer] = useState<string | null>(null);
+  const [analysisPoints, setAnalysisPoints] = useState<{ builtup: {y: number, x: number}[], change: {y: number, x: number}[] } | null>(null);
 
   const [tokenHistory, setTokenHistory] = useState<{ts: number, val: number}[]>([]);
   const [tokensRemaining, setTokensRemaining] = useState<number>(21000000);
@@ -342,6 +349,7 @@ const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
 const processMarkedImage = async (originalFile: File, answerText: string) => {
   let boxes: {ymin: number, xmin: number, ymax: number, xmax: number, label: string}[] = [];
   let cleanText = answerText;
+  let pointsData: { builtup: {y: number, x: number}[], change: {y: number, x: number}[] } | null = null;
 
   try {
     const rawStr = answerText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -354,9 +362,19 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
       }));
     }
     
+    if (data.builtup_pts || data.change_pts) {
+      pointsData = { builtup: [], change: [] };
+      if (Array.isArray(data.builtup_pts)) {
+        pointsData.builtup = data.builtup_pts.map((pt: number[]) => ({ y: pt[0] / 10, x: pt[1] / 10 }));
+      }
+      if (Array.isArray(data.change_pts)) {
+        pointsData.change = data.change_pts.map((pt: number[]) => ({ y: pt[0] / 10, x: pt[1] / 10 }));
+      }
+    }
+
     let formattedText = '';
     for (const [k, v] of Object.entries(data)) {
-      if (k === 'boxes') continue;
+      if (k === 'boxes' || k === 'builtup_pts' || k === 'change_pts') continue;
       if (Array.isArray(v)) {
         formattedText += `**${k.replace(/_/g, ' ').toUpperCase()}**\n${v.map((item) => `• ${item}`).join('\n')}\n\n`;
       } else {
@@ -377,17 +395,17 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
   }
 
   if (boxes.length === 0) {
-    return { cleanText: cleanText || answerText, markedUrl: null };
+    return { cleanText: cleanText || answerText, markedUrl: null, pointsData };
   }
 
-  return new Promise<{cleanText: string, markedUrl: string | null}>((resolve) => {
+  return new Promise<{cleanText: string, markedUrl: string | null, pointsData: typeof pointsData}>((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return resolve({ cleanText, markedUrl: null });
+      if (!ctx) return resolve({ cleanText, markedUrl: null, pointsData });
 
       ctx.drawImage(img, 0, 0);
 
@@ -415,9 +433,9 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         }
       });
 
-      resolve({ cleanText, markedUrl: canvas.toDataURL('image/jpeg', 0.9) });
+      resolve({ cleanText, markedUrl: canvas.toDataURL('image/jpeg', 0.9), pointsData });
     };
-    img.onerror = () => resolve({ cleanText, markedUrl: null });
+    img.onerror = () => resolve({ cleanText, markedUrl: null, pointsData });
     img.src = URL.createObjectURL(originalFile);
   });
 };
@@ -464,6 +482,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
     setResult(null);
     setMarkedImage(null);
     setCleanAnswer(null);
+    setAnalysisPoints(null);
 
     try {
       let maxWidth = 512; 
@@ -511,9 +530,10 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
       if (!res.ok) throw new Error(data.error || 'Analysis failed.');
       
       if (slots[0]?.file && data.answer) {
-        const { cleanText, markedUrl } = await processMarkedImage(slots[0].file, data.answer);
+        const { cleanText, markedUrl, pointsData } = await processMarkedImage(slots[0].file, data.answer);
         setCleanAnswer(cleanText);
         setMarkedImage(markedUrl);
+        if (pointsData) setAnalysisPoints(pointsData);
       } else {
         setCleanAnswer(data.answer);
         setMarkedImage(null);
@@ -675,7 +695,7 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
           </div>
 
           {mode === 'crossmodal' && slots[0]?.preview && slots[1]?.preview && (
-            <FusedLayersInspector opticalUrl={slots[0].preview} sarUrl={slots[1].preview} />
+            <FusedLayersInspector opticalUrl={slots[0].preview} sarUrl={slots[1].preview} analysisPoints={analysisPoints} />
           )}
           
           {markedImage && (

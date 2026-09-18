@@ -67,7 +67,7 @@ const PROMPTS: Record<string, string> = {
 
   change_vqa: `Images: 1 (earlier) and 2 (later). {query}\nOutput JSON format: {"answer": "short fact", "confidence": "High/Low"}`,
 
-  cross_modal: `Images: 1 (Optical) and 2 (SAR). {query}\nOutput JSON format: {"optical_feat": ["f1"], "sar_feat": ["f1"], "fusion": "insight", "confidence": "High/Low"}`,
+  cross_modal: `Images: 1 (Optical) and 2 (SAR). {query}\nOutput JSON format: {"optical_feat": ["f1"], "sar_feat": ["f1"], "fusion": "insight", "builtup_pts": [[y,x]], "change_pts": [[y,x]], "confidence": "High/Low"}`,
 };
 
 type TaskType =
