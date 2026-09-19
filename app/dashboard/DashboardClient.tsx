@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import * as GeoTIFF from 'geotiff';
 
 type Mode = 'single' | 'bitemporal' | 'crossmodal';
 
@@ -69,16 +70,11 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
 
 const processTiff = async (file: File, maxWidth: number): Promise<File> => {
   try {
-    const UTIF = require('utif');
     const arrayBuffer = await file.arrayBuffer();
-    const ifds = UTIF.decode(arrayBuffer);
-    if (!ifds || ifds.length === 0) throw new Error("Could not decode TIFF headers.");
-    
-    UTIF.decodeImage(arrayBuffer, ifds[0]);
-    const rgba = UTIF.toRGBA8(ifds[0]); 
-
-    let width = ifds[0].width;
-    let height = ifds[0].height;
+    const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+    const image = await tiff.getImage();
+    const width = image.getWidth();
+    const height = image.getHeight();
     
     let cw = width;
     let ch = height;
@@ -97,6 +93,19 @@ const processTiff = async (file: File, maxWidth: number): Promise<File> => {
     const imgData = ctx.createImageData(cw, ch);
     const dstData = imgData.data;
 
+    const rasters = await image.readRasters() as any[];
+    const bandCount = rasters.length;
+    let min = Infinity, max = -Infinity;
+    
+    const raster0 = rasters[0];
+    const len = raster0.length;
+    for (let i = 0; i < len; i += 10) { 
+      const val = raster0[i];
+      if (val < min) min = val;
+      if (val > max) max = val;
+    }
+    const range = max - min === 0 ? 1 : max - min;
+
     const scaleX = width / cw;
     const scaleY = height / ch;
 
@@ -104,13 +113,17 @@ const processTiff = async (file: File, maxWidth: number): Promise<File> => {
       for (let x = 0; x < cw; x++) {
         const srcX = Math.floor(x * scaleX);
         const srcY = Math.floor(y * scaleY);
-        const srcIdx = (srcY * width + srcX) * 4;
+        const srcIdx = srcY * width + srcX;
         const dstIdx = (y * cw + x) * 4;
         
-        dstData[dstIdx] = rgba[srcIdx];
-        dstData[dstIdx + 1] = rgba[srcIdx + 1];
-        dstData[dstIdx + 2] = rgba[srcIdx + 2];
-        dstData[dstIdx + 3] = rgba[srcIdx + 3];
+        const rVal = Math.floor(((rasters[0][srcIdx] - min) / range) * 255);
+        const gVal = bandCount > 1 ? Math.floor(((rasters[1][srcIdx] - min) / range) * 255) : rVal;
+        const bVal = bandCount > 2 ? Math.floor(((rasters[2][srcIdx] - min) / range) * 255) : rVal;
+        
+        dstData[dstIdx] = Math.max(0, Math.min(255, rVal));
+        dstData[dstIdx + 1] = Math.max(0, Math.min(255, gVal));
+        dstData[dstIdx + 2] = Math.max(0, Math.min(255, bVal));
+        dstData[dstIdx + 3] = 255;
       }
     }
     
