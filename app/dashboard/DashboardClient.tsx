@@ -450,38 +450,6 @@ export default function DashboardClient() {
     setCleanAnswer(null);
   };
 
-const resizeImage = (file: File, maxWidth: number = 1024): Promise<File> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxWidth || height > maxWidth) {
-          const ratio = Math.min(maxWidth / width, maxWidth / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(file);
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => blob ? resolve(new File([blob], file.name, { type: 'image/jpeg' })) : resolve(file),
-          'image/jpeg',
-          0.85 
-        );
-      };
-      img.onerror = () => resolve(file);
-      img.src = event.target?.result as string;
-    };
-    reader.onerror = () => resolve(file);
-    reader.readAsDataURL(file);
-  });
-};
-
 const processMarkedImage = async (originalFile: File, answerText: string) => {
   let boxes: {ymin: number, xmin: number, ymax: number, xmax: number, label: string}[] = [];
   let cleanText = answerText;
