@@ -95,15 +95,21 @@ const processTiff = async (file: File, maxWidth: number): Promise<File> => {
 
     const rasters = await image.readRasters() as any[];
     const bandCount = rasters.length;
-    let min = Infinity, max = -Infinity;
     
+    // Robust 2nd and 98th percentile stretch to ignore outliers
     const raster0 = rasters[0];
     const len = raster0.length;
-    for (let i = 0; i < len; i += 10) { 
-      const val = raster0[i];
-      if (val < min) min = val;
-      if (val > max) max = val;
+    const sampleSize = Math.min(len, 10000);
+    const step = Math.floor(len / sampleSize) || 1;
+    const samples = [];
+    for (let i = 0; i < len; i += step) {
+      if (!isNaN(raster0[i])) samples.push(raster0[i]);
     }
+    samples.sort((a, b) => a - b);
+    
+    let min = samples[Math.floor(samples.length * 0.02)] || 0;
+    let max = samples[Math.floor(samples.length * 0.98)] || 255;
+    if (min === max) { min = samples[0]; max = samples[samples.length - 1]; }
     const range = max - min === 0 ? 1 : max - min;
 
     const scaleX = width / cw;
