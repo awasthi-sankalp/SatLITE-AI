@@ -122,7 +122,9 @@ const processTiff = async (file: File, maxWidth: number): Promise<File> => {
     });
 
   } catch (e) {
-    console.error('TIFF processing error:', e);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('TIFF processing error:', msg);
+    alert('Failed to compress TIFF image in browser. It may be an unsupported satellite format (e.g. 32-bit float, >4 bands, or BigTIFF). Error: ' + msg.substring(0, 100));
     return file;
   }
 };
@@ -618,12 +620,14 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
         console.warn('Pre-flight classification failed, defaulting to Eco Mode', e);
       }
 
-      const resizedFiles = await Promise.all(
-        slots.map(async (slot) => {
-          if (!slot) return null;
-          return await resizeImage(slot.file, maxWidth);
-        })
-      );
+      const resizedFiles: (File | null)[] = [];
+      for (const slot of slots) {
+        if (!slot) {
+          resizedFiles.push(null);
+        } else {
+          resizedFiles.push(await resizeImage(slot.file, maxWidth));
+        }
+      }
 
       const form = new FormData();
       form.append('query', query);
