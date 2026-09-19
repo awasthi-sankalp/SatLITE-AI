@@ -89,30 +89,32 @@ const processTiff = async (file: File, maxWidth: number): Promise<File> => {
     }
 
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = cw;
+    canvas.height = ch;
     const ctx = canvas.getContext('2d');
     if (!ctx) return file;
     
-    const imgData = ctx.createImageData(width, height);
-    imgData.data.set(rgba);
-    ctx.putImageData(imgData, 0, 0);
+    const imgData = ctx.createImageData(cw, ch);
+    const dstData = imgData.data;
 
-    if (cw !== width || ch !== height) {
-      const smallCanvas = document.createElement('canvas');
-      smallCanvas.width = cw;
-      smallCanvas.height = ch;
-      const smallCtx = smallCanvas.getContext('2d');
-      if (smallCtx) {
-        smallCtx.drawImage(canvas, 0, 0, width, height, 0, 0, cw, ch);
-        return new Promise((resolve) => {
-          smallCanvas.toBlob((blob) => {
-            if (blob) resolve(new File([blob], file.name.replace(/\.tiff?$/i, '.jpg'), { type: 'image/jpeg' }));
-            else resolve(file);
-          }, 'image/jpeg', 0.8);
-        });
+    const scaleX = width / cw;
+    const scaleY = height / ch;
+
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        const srcX = Math.floor(x * scaleX);
+        const srcY = Math.floor(y * scaleY);
+        const srcIdx = (srcY * width + srcX) * 4;
+        const dstIdx = (y * cw + x) * 4;
+        
+        dstData[dstIdx] = rgba[srcIdx];
+        dstData[dstIdx + 1] = rgba[srcIdx + 1];
+        dstData[dstIdx + 2] = rgba[srcIdx + 2];
+        dstData[dstIdx + 3] = rgba[srcIdx + 3];
       }
     }
+    
+    ctx.putImageData(imgData, 0, 0);
 
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
