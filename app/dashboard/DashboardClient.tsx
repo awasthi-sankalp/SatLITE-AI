@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import * as GeoTIFF from 'geotiff';
 
 type Mode = 'single' | 'bitemporal' | 'crossmodal';
 
@@ -70,11 +69,16 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
 
 const processTiff = async (file: File, maxWidth: number): Promise<File> => {
   try {
+    const UTIF = require('utif');
     const arrayBuffer = await file.arrayBuffer();
-    const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-    const image = await tiff.getImage();
-    const width = image.getWidth();
-    const height = image.getHeight();
+    const ifds = UTIF.decode(arrayBuffer);
+    if (!ifds || ifds.length === 0) throw new Error("Could not decode TIFF headers.");
+    
+    UTIF.decodeImage(arrayBuffer, ifds[0]);
+    const rgba = UTIF.toRGBA8(ifds[0]); 
+
+    let width = ifds[0].width;
+    let height = ifds[0].height;
     
     let cw = width;
     let ch = height;
@@ -91,27 +95,7 @@ const processTiff = async (file: File, maxWidth: number): Promise<File> => {
     if (!ctx) return file;
     
     const imgData = ctx.createImageData(width, height);
-    const rasters = await image.readRasters() as any[];
-    
-    const bandCount = rasters.length;
-    let min = Infinity, max = -Infinity;
-    for (let i = 0; i < rasters[0].length; i++) {
-        const val = rasters[0][i];
-        if (val < min) min = val;
-        if (val > max) max = val;
-    }
-    const range = max - min === 0 ? 1 : max - min;
-
-    for (let i = 0, j = 0; i < rasters[0].length; i++, j += 4) {
-      const rVal = Math.floor(((rasters[0][i] - min) / range) * 255);
-      const gVal = bandCount > 1 ? Math.floor(((rasters[1][i] - min) / range) * 255) : rVal;
-      const bVal = bandCount > 2 ? Math.floor(((rasters[2][i] - min) / range) * 255) : rVal;
-      imgData.data[j] = rVal;
-      imgData.data[j + 1] = gVal;
-      imgData.data[j + 2] = bVal;
-      imgData.data[j + 3] = 255;
-    }
-    
+    imgData.data.set(rgba);
     ctx.putImageData(imgData, 0, 0);
 
     if (cw !== width || ch !== height) {
@@ -138,7 +122,7 @@ const processTiff = async (file: File, maxWidth: number): Promise<File> => {
     });
 
   } catch (e) {
-    console.error('TIFF processing error', e);
+    console.error('TIFF processing error:', e);
     return file;
   }
 };
