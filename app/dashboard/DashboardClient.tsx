@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import * as GeoTIFF from 'geotiff';
 
 type Mode = 'single' | 'bitemporal' | 'crossmodal';
 
@@ -58,7 +59,7 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
   bitemporal: [
     'What changed between these two dates, and where did the change occur?',
     'Has the built-up area increased, decreased, or remained unchanged?',
-    'Describe any signs of deforestation or vegetation loss.',
+    'What is the difference in vegetation between the two acquisitions?',
   ],
   crossmodal: [
     'Use the optical and SAR images together to identify built-up and water-covered regions.',
@@ -67,6 +68,118 @@ const SAMPLE_QUERIES: Record<Mode, string[]> = {
   ],
 };
 
+const processTiff = async (file: File, maxWidth: number): Promise<File> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+    const image = await tiff.getImage();
+    const width = image.getWidth();
+    const height = image.getHeight();
+    
+    let cw = width;
+    let ch = height;
+    if (cw > maxWidth || ch > maxWidth) {
+      const ratio = Math.min(maxWidth / cw, maxWidth / ch);
+      cw = Math.floor(cw * ratio);
+      ch = Math.floor(ch * ratio);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    
+    const imgData = ctx.createImageData(width, height);
+    const rasters = await image.readRasters() as any[];
+    
+    const bandCount = rasters.length;
+    let min = Infinity, max = -Infinity;
+    for (let i = 0; i < rasters[0].length; i++) {
+        const val = rasters[0][i];
+        if (val < min) min = val;
+        if (val > max) max = val;
+    }
+    const range = max - min === 0 ? 1 : max - min;
+
+    for (let i = 0, j = 0; i < rasters[0].length; i++, j += 4) {
+      const rVal = Math.floor(((rasters[0][i] - min) / range) * 255);
+      const gVal = bandCount > 1 ? Math.floor(((rasters[1][i] - min) / range) * 255) : rVal;
+      const bVal = bandCount > 2 ? Math.floor(((rasters[2][i] - min) / range) * 255) : rVal;
+      imgData.data[j] = rVal;
+      imgData.data[j + 1] = gVal;
+      imgData.data[j + 2] = bVal;
+      imgData.data[j + 3] = 255;
+    }
+    
+    ctx.putImageData(imgData, 0, 0);
+
+    if (cw !== width || ch !== height) {
+      const smallCanvas = document.createElement('canvas');
+      smallCanvas.width = cw;
+      smallCanvas.height = ch;
+      const smallCtx = smallCanvas.getContext('2d');
+      if (smallCtx) {
+        smallCtx.drawImage(canvas, 0, 0, width, height, 0, 0, cw, ch);
+        return new Promise((resolve) => {
+          smallCanvas.toBlob((blob) => {
+            if (blob) resolve(new File([blob], file.name.replace(/\.tiff?$/i, '.jpg'), { type: 'image/jpeg' }));
+            else resolve(file);
+          }, 'image/jpeg', 0.8);
+        });
+      }
+    }
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(new File([blob], file.name.replace(/\.tiff?$/i, '.jpg'), { type: 'image/jpeg' }));
+        else resolve(file);
+      }, 'image/jpeg', 0.8);
+    });
+
+  } catch (e) {
+    console.error('TIFF processing error', e);
+    return file;
+  }
+};
+
+const resizeImage = async (file: File, maxWidth: number = 1024): Promise<File> => {
+  if (file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff')) {
+    return processTiff(file, maxWidth);
+  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxWidth) {
+          const ratio = Math.min(maxWidth / width, maxWidth / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(new File([blob], file.name, { type: file.type || 'image/jpeg' }));
+            else resolve(file);
+          },
+          file.type || 'image/jpeg',
+          0.8
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
 
 const FACTORS = [
   {
@@ -121,13 +234,23 @@ function FusedLayersInspector({ opticalUrl, sarUrl, analysisPoints }: { opticalU
     let sarLoaded = false;
     const draw = () => {
       if (!optLoaded || !sarLoaded) return;
-      canvas.width = optImg.naturalWidth || optImg.width;
-      canvas.height = optImg.naturalHeight || optImg.height;
+      
+      let cw = optImg.naturalWidth || optImg.width;
+      let ch = optImg.naturalHeight || optImg.height;
+      const MAX_DIM = 1024;
+      if (cw > MAX_DIM || ch > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / cw, MAX_DIM / ch);
+        cw = Math.floor(cw * ratio);
+        ch = Math.floor(ch * ratio);
+      }
+      
+      canvas.width = cw;
+      canvas.height = ch;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (showOptical && !showSar) {
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1.0;
-        ctx.drawImage(optImg, 0, 0);
+        ctx.drawImage(optImg, 0, 0, canvas.width, canvas.height);
       } else if (!showOptical && showSar) {
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1.0;
@@ -135,7 +258,7 @@ function FusedLayersInspector({ opticalUrl, sarUrl, analysisPoints }: { opticalU
       } else if (showOptical && showSar) {
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1.0;
-        ctx.drawImage(optImg, 0, 0);
+        ctx.drawImage(optImg, 0, 0, canvas.width, canvas.height);
         ctx.globalCompositeOperation = blendMode;
         ctx.globalAlpha = 0.85;
         ctx.drawImage(sarImg, 0, 0, canvas.width, canvas.height);
@@ -402,12 +525,21 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      let cw = img.width;
+      let ch = img.height;
+      const MAX_DIM = 1024;
+      if (cw > MAX_DIM || ch > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / cw, MAX_DIM / ch);
+        cw = Math.floor(cw * ratio);
+        ch = Math.floor(ch * ratio);
+      }
+      
+      canvas.width = cw;
+      canvas.height = ch;
       const ctx = canvas.getContext('2d');
       if (!ctx) return resolve({ cleanText, markedUrl: null, pointsData });
 
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, cw, ch);
 
       boxes.forEach(box => {
         const y = (box.ymin / 1000) * canvas.height;
@@ -440,12 +572,14 @@ const processMarkedImage = async (originalFile: File, answerText: string) => {
   });
 };
 
-  const handleFile = useCallback((index: number, file: File) => {
-    const preview = URL.createObjectURL(file);
+  const handleFile = useCallback(async (index: number, file: File) => {
+    const resizedFile = await resizeImage(file, 1024);
+    const finalFile = resizedFile || file;
+    const preview = URL.createObjectURL(finalFile);
     const label = MODES.find((m2) => m2.id === mode)!.slots[index];
     setSlots((prev) => {
       const next = [...prev];
-      next[index] = { file, preview, label };
+      next[index] = { file: finalFile, preview, label };
       return next;
     });
   }, [mode]);
